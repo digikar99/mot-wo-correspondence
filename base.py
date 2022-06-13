@@ -49,21 +49,6 @@ def nearest_object_heuristic(objects, i, j, bound=None):
 		if x == 0: return random.choice(objects)
 		else: return random.choice(objects[:x])
 
-def clockwise_heuristic(object_map, i, j):
-	if object_map[i,j]: return (i,j)
-	# first axis increases downwards; second axis increases rightwards
-	upi, upj = max(i-1, 0), j
-	downi, downj = min(i+1, GRID_SIDE-1), j
-	lefti, leftj = i, max(0, j-1)
-	righti, rightj = i, min(GRID_SIDE-1, j+1)
-	if object_map[upi, upj]: return upi, upj
-	elif object_map[righti, rightj]: return righti, rightj
-	elif object_map[downi, downj]: return downi, downj
-	elif object_map[lefti, leftj]: return lefti, leftj
-	else:
-		print(i, j, object_map)
-		raise Exception("No object nearby!")
-
 GRID_SIDE = None
 # used in update_predicted_targets
 # PRINT_TARGET_UPDATES = True
@@ -111,7 +96,6 @@ class BaseMOT:
 		"""
 		# we cannot use target_map
 		objects                   = self.objects
-		target_position_predictor = self.target_position_predictor # unused
 		per_target_attention      = self.per_target_attention
 
 		predicted_target_map  = self.predicted_target_map
