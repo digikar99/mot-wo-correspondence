@@ -34,20 +34,20 @@ def nearest_object_heuristic(objects, i, j, bound=None):
 	# print(i, j, "\n", objects)
 	if bound is None: return objects[0]
 	else:
-		# newi, newj = objects[0]
-		# dist = np.sqrt((i-newi)**2 + (j-newj)**2)
-		# if dist <= bound: return objects[0]
-		# else: return random.choice(objects)
+		newi, newj = objects[0]
+		dist = np.sqrt((i-newi)**2 + (j-newj)**2)
+		if dist <= bound: return objects[0]
+		else: return random.choice(objects)
 
-		# Resulted in a constant curve
-		x = 0
-		while x < len(objects):
-			newi, newj = objects[x]
-			dist = np.sqrt((i-newi)**2 + (j-newj)**2)
-			if dist <= bound: x += 1
-			else: break
-		if x == 0: return random.choice(objects)
-		else: return random.choice(objects[:x])
+		# # Resulted in a constant curve
+		# x = 0
+		# while x < len(objects):
+		# 	newi, newj = objects[x]
+		# 	dist = np.sqrt((i-newi)**2 + (j-newj)**2)
+		# 	if dist <= bound: x += 1
+		# 	else: break
+		# if x == 0: return random.choice(objects)
+		# else: return random.choice(objects[:x])
 
 GRID_SIDE = None
 # used in update_predicted_targets
@@ -64,26 +64,30 @@ PER_TARGET_ATTENTION = 1
 
 class BaseMOT:
 
-	def __init__(self, grid_side, num_objects, num_targets, target_position_predictor,
-				 nearest_object_bound=None):
+	def __init__(self, grid_side, num_objects, num_targets,
+				 nearest_object_bound=None, per_target_attention=None):
 		self.grid_side   = grid_side
 		self.num_objects = num_objects
 		self.num_targets = num_targets
-		self.target_position_predictor = target_position_predictor
-		# self.per_target_attention = 1
-		# self.per_target_attention = 1 - np.log(num_targets)/np.log(8) + 0.01
-		# self.per_target_attention = 1.1 / (1.2)**num_targets
-		# self.per_target_attention = 1.5 / num_targets
-		# self.per_target_attention = 0.8
-		# self.per_target_attention = [1,0.95,0.9,0.8,0.6,0.4,0.1,0.03][num_targets-1]
-		self.per_target_attention = [1,0.85,0.7,0.6,0.5,0.3,0.1,0.03][num_targets-1]
-		# self.per_target_attention = 0
+		if per_target_attention is None:
+			# self.per_target_attention = 1
+			# self.per_target_attention = 1 - np.log(num_targets)/np.log(8) + 0.01
+			# self.per_target_attention = 1.1 / (1.2)**num_targets
+			# self.per_target_attention = 1.5 / num_targets
+			# self.per_target_attention = 0.8
+			# self.per_target_attention = [1,0.95,0.9,0.8,0.6,0.4,0.1,0.03][num_targets-1]
+			self.per_target_attention = [1,0.85,0.7,0.6,0.5,0.3,0.1,0.03][num_targets-1]
+			# self.per_target_attention = 0
+		else:
+			self.per_target_attention = per_target_attention
 
-		# self.nearest_object_bound = np.inf
-		self.nearest_object_bound = 30
-		# self.nearest_object_bound = 0
-		# self.nearest_object_bound = nearest_object_bound
-		# self.nearest_object_bound = 30 / self.per_target_attention
+		if nearest_object_bound is None:
+			self.nearest_object_bound = np.inf
+			# self.nearest_object_bound = 30
+			# self.nearest_object_bound = 0
+			# self.nearest_object_bound = 30 / self.per_target_attention
+		else:
+			self.nearest_object_bound = nearest_object_bound
 
 		self._new_predicted_target_map = np.zeros((grid_side, grid_side), dtype="int")
 		self._new_attention_map        = np.zeros((grid_side, grid_side))

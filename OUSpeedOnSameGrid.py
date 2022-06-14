@@ -110,14 +110,17 @@ class OUSpeedOnSameGrid(BaseMOT):
 
 def simulate(grid_side, num_simulations, num_time_steps, num_objects,
 			 num_targets, k, lm, sigma, print_range=False, return_dist=False,
-			 return_min_dist=False, last_step_uses_nearest_object=True):
+			 return_min_dist=False, last_step_uses_nearest_object=True,
+			 per_target_attention=None, nearest_object_bound=None):
 	untracked_targets = []
 	tracked_nontargets = []
 	min_distances = []
 	avg_distances = []
 	max_distances = []
 	for i in range(num_simulations):
-		mot_model = OUSpeedOnSameGrid(grid_side, num_objects, num_targets, TARGET_HEURISTIC)
+		mot_model = OUSpeedOnSameGrid(grid_side, num_objects, num_targets,
+									  per_target_attention = per_target_attention,
+									  nearest_object_bound = nearest_object_bound)
 		mot_model.initialize_maps(k=k, lm=lm, sigma=sigma)
 		for j in range(num_time_steps):
 			# if PRINT_MAPS:
@@ -460,8 +463,7 @@ def plot_nearest_object_benefit(
 
 if __name__ == "__main__":
 	np.random.seed(42)
-	# TARGET_HEURISTIC = clockwise_heuristic
-	TARGET_HEURISTIC = nearest_object_heuristic
+	# USE generate_plot_data.py and generate_plots.py INSTEAD OF THIS ==========
 	# utt, tnt = simulate(
 	# 	grid_side = 720,
 	# 	num_simulations = 5,
@@ -484,16 +486,16 @@ if __name__ == "__main__":
 	# 	lm = 0.9,
 	# 	sigma = 4,
 	# )
-	plot_acc_wrt_time(
-		grid_side = 720,
-		num_simulations = 100,
-		max_time = 50,
-		num_objects = 14,
-		num_targets = 4,
-		k = 0.0005,
-		lm = 0.9,
-		sigma = 2,
-	)
+	# plot_acc_wrt_time(
+	# 	grid_side = 720,
+	# 	num_simulations = 100,
+	# 	max_time = 50,
+	# 	num_objects = 14,
+	# 	num_targets = 4,
+	# 	k = 0.0005,
+	# 	lm = 0.9,
+	# 	sigma = 2,
+	# )
 	# plot_sigma_wrt_targets(
 	# 	base_grid_side = 720,
 	# 	num_simulations = 50,
@@ -543,3 +545,4 @@ if __name__ == "__main__":
 	# 	lm=0.9,
 	# 	sigma=4
 	# )
+	# USE generate_plot_data.py and generate_plots.py INSTEAD OF THIS ==========

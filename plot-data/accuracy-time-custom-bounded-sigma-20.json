@@ -1,0 +1,35 @@
+{
+ "title": "Accuracy vs Time of tracking (14 objects, 4 targets, sigma=2)",
+ "xlabel": "Number of time steps",
+ "ylabel": "Accuracy",
+ "plot_type": "errorbar",
+ "ylim": [
+  0,
+  100
+ ],
+ "data": {
+  "Accuracy": [
+   [
+    10,
+    18,
+    26,
+    34,
+    42
+   ],
+   [
+    97.0,
+    95.75,
+    94.5,
+    88.0,
+    87.25
+   ],
+   [
+    0.8164965809277259,
+    1.0084867151060815,
+    1.09981632993694,
+    1.527525231651947,
+    1.6086492859702282
+   ]
+  ]
+ }
+}
