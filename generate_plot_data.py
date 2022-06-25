@@ -281,6 +281,65 @@ def plot_sigma_wrt_targets(
 	)
 	return np.arange(1,max_num_targets+1), sigma_threshold_list
 
+
+def plot_harmonic_sigma_wrt_targets(
+		base_grid_side,
+		num_simulations,
+		num_time_steps,
+		num_objects,
+		max_num_targets,
+		k, lm, max_sigma=None, sigma_list=None,
+		accuracy_threshold = 80,
+		last_step_uses_nearest_object = True,
+		nearest_object_bound=None,
+		update_strategy = "random"
+):
+	grid_side = base_grid_side
+	min_sigma = 0.1
+	int_sigma = ((max_sigma - min_sigma)/10 if max_sigma is not None else None)
+	sigma_list = (np.arange(max_sigma,min_sigma,-int_sigma) if sigma_list is None else sigma_list)
+	sigma_threshold_list = []
+	print("num_targets sigma accuracy")
+	for num_targets in range(1,max_num_targets+1):
+		for sigma in sigma_list:
+			untracked_targets, tracked_nontargets = \
+				simulate(grid_side, num_simulations, num_time_steps, num_objects,
+						 num_targets, k, lm, sigma,
+						 last_step_uses_nearest_object = last_step_uses_nearest_object,
+						 per_target_attention = 1.6/num_targets,
+						 nearest_object_bound = nearest_object_bound,
+						 update_strategy=update_strategy)
+
+			# How many of the tracked objects are targets?
+			# accuracy = 100 * (num_targets - np.mean(tracked_nontargets))/num_targets
+			accuracy = 100 * (num_targets
+							  - 0.5*(np.mean(tracked_nontargets)
+									 + np.mean(untracked_targets)))/num_targets
+
+			# # Equation 1 from Alverez et al (2007) - irrelevant here
+			# C = (num_targets * num_simulations - np.sum(untracked_targets)) / num_simulations
+			# n = num_targets
+			# m = num_objects
+			# accuracy = 100 * (C + (n-C)*(n-C)/(m-C)) / n
+
+			# accuracy = 100 * \
+			# 	(1 - ((np.sum(untracked_targets))
+			# 		  / (num_targets * len(untracked_targets))))
+
+			print(num_targets, sigma, accuracy)
+			if (accuracy >= accuracy_threshold) or (sigma == sigma_list[-1]):
+				sigma_threshold = sigma
+				sigma_threshold_list.append(sigma_threshold)
+				break
+
+	filename = get_filename(
+		"sigma-targets-harmonic",
+		accuracy = accuracy_threshold,
+		time = num_time_steps,
+		last_step_uses_nearest_object = last_step_uses_nearest_object,
+		per_target_attention = per_target_attention,
+		nearest_object_bound = nearest_object_bound,
+		update_strategy = update_strategy
 	)
 	write_plot_file(
 		filename = filename,
