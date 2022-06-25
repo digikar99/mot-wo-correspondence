@@ -225,15 +225,21 @@ def plot_sigma_wrt_targets(
 	int_sigma = ((max_sigma - min_sigma)/10 if max_sigma is not None else None)
 	sigma_list = (np.arange(max_sigma,min_sigma,-int_sigma) if sigma_list is None else sigma_list)
 	sigma_threshold_list = []
+	num_targets_list = np.arange(1, max_num_targets+1)
+	if type(nearest_object_bound) == list: nob_list = nearest_object_bound
+	else: nob_list = [nearest_object_bound] * max_num_targets
 	print("num_targets sigma accuracy")
-	for num_targets in range(1,max_num_targets+1):
+	for i in range(max_num_targets):
+		num_targets = num_targets_list[i]
+		nearest_object_bound = nob_list[i]
 		for sigma in sigma_list:
 			untracked_targets, tracked_nontargets = \
 				simulate(grid_side, num_simulations, num_time_steps, num_objects,
 						 num_targets, k, lm, sigma,
 						 last_step_uses_nearest_object = last_step_uses_nearest_object,
 						 per_target_attention = per_target_attention,
-						 nearest_object_bound = nearest_object_bound)
+						 nearest_object_bound = nearest_object_bound,
+						 update_strategy=update_strategy)
 
 			# How many of the tracked objects are targets?
 			# accuracy = 100 * (num_targets - np.mean(tracked_nontargets))/num_targets
