@@ -34,7 +34,8 @@ def get_filename(base_name,
 				 sigma=None,
 				 per_target_attention=None,
 				 last_step_uses_nearest_object=True,
-				 nearest_object_bound=None):
+				 nearest_object_bound=None,
+				 update_strategy=""):
 
 	prefix = ("custom" if per_target_attention is None else "constant")
 
@@ -49,7 +50,7 @@ def get_filename(base_name,
 	sigma    = ("" if sigma is None else "sigma-"+str(int(sigma*10)))
 	time     = ("" if time is None else "time-"+str(int(time)))
 
-	parts = [base_name, prefix, update_scheme, accuracy, sigma, time]
+	parts = [base_name, prefix, update_scheme, accuracy, sigma, time, update_strategy, "activation"]
 	parts = list(part for part in parts if part != "")
 
 	return "-".join(parts)
@@ -58,7 +59,7 @@ def get_filename(base_name,
 def plot_acc_wrt_targets(
 		grid_side, num_simulations, num_time_steps, num_objects, max_num_targets,
 		k, lm, sigma, per_target_attention=None, last_step_uses_nearest_object=True,
-		nearest_object_bound=None
+		nearest_object_bound=None, update_strategy="random"
 ):
 	untracked_target_list     = []
 	untracked_target_list_se  = []
@@ -73,7 +74,8 @@ def plot_acc_wrt_targets(
 					 k = k, lm = lm, sigma = sigma,
 					 last_step_uses_nearest_object = last_step_uses_nearest_object,
 					 per_target_attention = per_target_attention,
-					 nearest_object_bound = nearest_object_bound)
+					 nearest_object_bound = nearest_object_bound,
+					 update_strategy = update_strategy)
 
 		untracked_target_list.append(np.mean(untracked_targets))
 		untracked_target_list_se.append(np.std(untracked_targets, ddof=1)/np.sqrt(num_simulations))
@@ -106,6 +108,7 @@ def plot_acc_wrt_targets(
 		per_target_attention = per_target_attention,
 		last_step_uses_nearest_object = last_step_uses_nearest_object,
 		nearest_object_bound = nearest_object_bound,
+		update_strategy = update_strategy
 	)
 	print(filename)
 
@@ -132,7 +135,8 @@ def plot_acc_wrt_time(
 		k, lm, sigma,
 		per_target_attention=None,
 		last_step_uses_nearest_object=True,
-		nearest_object_bound=None
+		nearest_object_bound=None,
+		update_strategy="random"
 ):
 	"""
 	Plots percentage of targets that were tracked wrt time
@@ -150,7 +154,8 @@ def plot_acc_wrt_time(
 					 k = k, lm = lm, sigma = sigma,
 					 last_step_uses_nearest_object = last_step_uses_nearest_object,
 					 nearest_object_bound = nearest_object_bound,
-					 per_target_attention = per_target_attention)
+					 per_target_attention = per_target_attention,
+					 update_strategy=update_strategy)
 
 		untracked_target_list.append(np.mean(untracked_targets))
 		untracked_target_list_se.append(np.std(untracked_targets, ddof=1)/np.sqrt(num_simulations))
@@ -175,6 +180,7 @@ def plot_acc_wrt_time(
 		per_target_attention = per_target_attention,
 		last_step_uses_nearest_object = last_step_uses_nearest_object,
 		nearest_object_bound = nearest_object_bound,
+		update_strategy = update_strategy
 	)
 	print(filename)
 	# Number of tracked objects that are targets
@@ -211,7 +217,8 @@ def plot_sigma_wrt_targets(
 		accuracy_threshold = 80,
 		last_step_uses_nearest_object = True,
 		per_target_attention=None,
-		nearest_object_bound=None
+		nearest_object_bound=None,
+		update_strategy = "random"
 ):
 	grid_side = base_grid_side
 	min_sigma = 0.1
@@ -256,7 +263,24 @@ def plot_sigma_wrt_targets(
 		time = num_time_steps,
 		last_step_uses_nearest_object = last_step_uses_nearest_object,
 		per_target_attention = per_target_attention,
-		nearest_object_bound = nearest_object_bound
+		nearest_object_bound = nearest_object_bound,
+		update_strategy = update_strategy
+	)
+	write_plot_file(
+		filename = filename,
+		title = "Velocity (sigma) Threshold vs Number of Targets\n({0} Simulations, {1} Time Steps)"\
+			.format(
+				num_simulations,
+				num_time_steps
+			),
+		ylim = [0, max(sigma_list)],
+		plot_type = "plot",
+		xlabel = "Number of targets ({0} objects)".format(num_objects),
+		ylabel = "Sigma threshold ({0}% accuracy)".format(accuracy_threshold),
+		data = {"": [np.arange(1,max_num_targets+1), sigma_threshold_list]}
+	)
+	return np.arange(1,max_num_targets+1), sigma_threshold_list
+
 	)
 	write_plot_file(
 		filename = filename,
@@ -502,6 +526,19 @@ if __name__ == "__main__":
 	# 	last_step_uses_nearest_object=True,
 	# 	nearest_object_bound=30
 	# )
+	# plot_acc_wrt_targets(
+	# 	grid_side = 720,
+	# 	num_simulations = 50,
+	# 	num_time_steps = 50,
+	# 	num_objects = 14,
+	# 	max_num_targets = 8,
+	# 	k = 0.0005,
+	# 	lm = 0.9,
+	# 	sigma = 4,
+	# 	last_step_uses_nearest_object=True,
+	# 	nearest_object_bound=30,
+	# 	update_strategy = "lowest"
+	# )
 
 	# # SECTION 2: Accuracy vs Time of trial =====================================
 	# plot_acc_wrt_time(
@@ -559,6 +596,19 @@ if __name__ == "__main__":
 	# 	sigma = 2,
 	# 	last_step_uses_nearest_object = True,
 	# 	nearest_object_bound = 30
+	# )
+	# plot_acc_wrt_time(
+	# 	grid_side = 720,
+	# 	num_simulations = 100,
+	# 	max_time = 50,
+	# 	num_objects = 14,
+	# 	num_targets = 4,
+	# 	k = 0.0005,
+	# 	lm = 0.9,
+	# 	sigma = 2,
+	# 	last_step_uses_nearest_object = True,
+	# 	nearest_object_bound = 30,
+	# 	update_strategy = "lowest"
 	# )
 
 	# SECTION 3: Velocity / Sigma threshold vs Number of targets ===============
@@ -635,6 +685,62 @@ if __name__ == "__main__":
 	# 	last_step_uses_nearest_object = True
 	# )
 	# plot_sigma_wrt_targets(
+	# 	base_grid_side = 720,
+	# 	num_simulations = 50,
+	# 	num_time_steps = 50,
+	# 	num_objects = 14,
+	# 	max_num_targets = 8,
+	# 	k = 0.0005,
+	# 	lm = 0.9,
+	# 	sigma_list = [5, 4.5, 4, 3.6, 3.3, 3, 2.7, 2.4, 2.1, 1.8, 1.5,
+	# 				  1.2, 1.0, 0.8, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1],
+	# 	accuracy_threshold = 80,
+	# 	last_step_uses_nearest_object = True,
+	# 	nearest_object_bound = 30
+	# )
+	# utt, tnt = simulate(
+	# 	grid_side = 720,
+	# 	num_simulations = 5,
+	# 	num_time_steps = 150,
+	# 	num_objects = 14,
+	# 	num_targets = 4,
+	# 	k = 0.0005,
+	# 	lm = 0.9,
+	# 	sigma = 1,
+	# 	print_range=True,
+	# )
+	# plot_sigma_wrt_targets(
+	# 	base_grid_side = 720,
+	# 	num_simulations = 50,
+	# 	num_time_steps = 35,
+	# 	num_objects = 14,
+	# 	max_num_targets = 8,
+	# 	k = 0.0005,
+	# 	lm = 0.9,
+	# 	# sigma_list = [5, 4.5, 4, 3.6, 3.3, 3, 2.7, 2.4, 2.1, 1.8, 1.5,
+	# 	# 			  1.2, 1.0, 0.8, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1],
+	# 	sigma_list = [3, 2.7, 2.4, 2.1, 1.8, 1.5,
+	# 				  1.2, 1.0, 0.8, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1],
+	# 	accuracy_threshold = 90,
+	# 	last_step_uses_nearest_object = True,
+	# 	nearest_object_bound = 30 # [12, 15, 20, 25, 30, 35, 40, 45, 50]
+	# )
+	# plot_sigma_wrt_targets(
+	# 	base_grid_side = 720,
+	# 	num_simulations = 50,
+	# 	num_time_steps = 50,
+	# 	num_objects = 14,
+	# 	max_num_targets = 8,
+	# 	k = 0.0005,
+	# 	lm = 0.9,
+	# 	sigma_list = [5, 4.5, 4, 3.6, 3.3, 3, 2.7, 2.4, 2.1, 1.8, 1.5,
+	# 				  1.2, 1.0, 0.8, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1],
+	# 	accuracy_threshold = 90,
+	# 	last_step_uses_nearest_object = True,
+	# 	nearest_object_bound = 30, # [12, 15, 20, 25, 30, 35, 40, 45, 50]
+	# 	update_strategy =  "lowest"
+	# )
+	# plot_harmonic_sigma_wrt_targets(
 	# 	base_grid_side = 720,
 	# 	num_simulations = 50,
 	# 	num_time_steps = 50,

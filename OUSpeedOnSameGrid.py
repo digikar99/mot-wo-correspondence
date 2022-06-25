@@ -38,7 +38,7 @@ class OUSpeedOnSameGrid(BaseMOT):
 		self.target_map = target_map
 		self.attention_map = attention_map
 		self.predicted_target_map = predicted_target_map
-		self.predicted_targets = nonzeros(predicted_target_map)
+		self.predicted_targets = list(map(lambda x: (x[0], x[1]), nonzeros(predicted_target_map)))
 		self.object_parameters = object_parameters
 		self.k, self.lm, self.sigma = k, lm, sigma
 
@@ -111,7 +111,7 @@ class OUSpeedOnSameGrid(BaseMOT):
 def simulate(grid_side, num_simulations, num_time_steps, num_objects,
 			 num_targets, k, lm, sigma, print_range=False, return_dist=False,
 			 return_min_dist=False, last_step_uses_nearest_object=True,
-			 per_target_attention=None, nearest_object_bound=None):
+			 per_target_attention=None, nearest_object_bound=None, update_strategy="random"):
 	untracked_targets = []
 	tracked_nontargets = []
 	min_distances = []
@@ -128,7 +128,7 @@ def simulate(grid_side, num_simulations, num_time_steps, num_objects,
 			# 	print("Objects", object_map, "Targets", target_map, "Predicted targets",
 			# 		  predicted_target_map, "Attention", attention_map, sep="\n")
 			mot_model.update_objects_and_targets()
-			mot_model.update_predicted_targets()
+			mot_model.update_predicted_targets(strategy=update_strategy)
 		if return_dist:
 			dist = mot_model.get_recovery_distances()
 			if dist is None: continue
@@ -222,7 +222,7 @@ def plot_acc_wrt_targets(
 
 def plot_acc_wrt_time(
 		grid_side, num_simulations, max_time, num_objects, num_targets,
-		k, lm, sigma,
+		k, lm, sigma
 ):
 	"""
 	Plots percentage of targets that were tracked wrt time

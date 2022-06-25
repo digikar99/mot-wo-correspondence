@@ -93,10 +93,15 @@ class BaseMOT:
 		self._new_attention_map        = np.zeros((grid_side, grid_side))
 		self._new_object_map           = np.zeros((grid_side, grid_side), dtype="int")
 
-	def update_predicted_targets(self, evaluate=False):
+	def update_predicted_targets(self, evaluate=False, strategy="random"):
 		"""
-		new_predicted_target_position:
-		  function that takes (new) object_map and old coordinates of attended location
+		evaluate: if True, updates each predicted target location so that each points
+		  to an object
+		strategy: Possible values - random, lowest
+		  - lowest corresponds to updating the predicted target with lowest activation
+			in accordance with the Oksama's MOMIT model (adapted for MOT task)
+		  - random corresponds to updating in accordance with the values of
+			per_target_attention
 		"""
 		# we cannot use target_map
 		objects                   = self.objects
@@ -110,16 +115,29 @@ class BaseMOT:
 		new_predicted_targets = []
 		# print("Object map\n", object_map)
 		# print("Predicted_Target map\n", predicted_target_map)
-		for (i,j) in predicted_targets:
-			if not evaluate and np.random.random() >= per_target_attention:
-				new_predicted_target_map[i,j] += 1
-				new_predicted_targets.append((i,j))
-				# if PRINT_TARGET_UPDATES: print("  Not updating", (i,j))
-				continue
-			# if PRINT_TARGET_UPDATES: print("  Updating", (i,j))
+
+		if evaluate:
+			for (i,j) in predicted_targets:
+				# if PRINT_TARGET_UPDATES: print("  Updating", (i,j))
+				newi, newj = nearest_object_heuristic(objects, i, j, bound=self.nearest_object_bound)
+				# new_predicted_target_map[newi, newj] += 1
+				new_predicted_targets.append((newi, newj))
+		elif strategy == "random":
+			for (i,j) in predicted_targets:
+				# if PRINT_TARGET_UPDATES: print("  Updating", (i,j))
+				if np.random.random() >= per_target_attention:
+					newi, newj = nearest_object_heuristic(objects, i, j, bound=self.nearest_object_bound)
+					# new_predicted_target_map[newi, newj] += 1
+					new_predicted_targets.append((newi, newj))
+				else:
+					# new_predicted_target_map[i,j] += 1
+					new_predicted_targets.append((i,j))
+		elif strategy == "lowest":
+			i, j = predicted_targets[0]
 			newi, newj = nearest_object_heuristic(objects, i, j, bound=self.nearest_object_bound)
-			new_predicted_target_map[newi, newj] += 1
-			new_predicted_targets.append((newi, newj))
+			new_predicted_targets = predicted_targets[1:] + [(newi,newj)]
+		else:
+			raise Exception("Unknown strategy: " + strategy)
 
 		for (i,j) in predicted_targets: predicted_target_map[i,j] -= 1
 		for (i,j) in new_predicted_targets: predicted_target_map[i,j] += 1
