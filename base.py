@@ -252,7 +252,7 @@ class BaseMOT:
 		tracked_nontargets = np.sum(
 			np.multiply(
 				predicted_target_map * (predicted_target_map != 0),
-				target_map == 0,
+				(target_map == 0) * (object_map == 1),
 			)
 		)
 
