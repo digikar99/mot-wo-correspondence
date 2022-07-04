@@ -1,10 +1,11 @@
 import matplotlib.pyplot as plt
 import json
 import os
+import sys
 
 plt.rcParams.update({'font.size': 16})
 
-PLOT_DATA_DIR="plot-data/"
+PLOT_DATA_DIR=("plot-data/" if len(sys.argv)<2 else sys.argv[1])
 PLOT_DIR="plots/"
 
 if __name__ == "__main__":
@@ -12,23 +13,27 @@ if __name__ == "__main__":
 	for data_file in data_files:
 		basename = data_file.rsplit(".", maxsplit=1)[0]
 		with open(PLOT_DATA_DIR+data_file) as inf:
-			plot_details = json.load(inf)
-			plt.clf()
-			plt.title(plot_details["title"])
-			plt.xlabel(plot_details["xlabel"])
-			plt.ylabel(plot_details["ylabel"])
-			plt.ylim(*plot_details["ylim"])
+			try:
+				plot_details = json.load(inf)
+				plt.clf()
+				plt.title(plot_details["title"])
+				plt.xlabel(plot_details["xlabel"])
+				plt.ylabel(plot_details["ylabel"])
+				plt.ylim(*plot_details["ylim"])
 
-			plotfun = plot_details["plot_type"]
-			data = plot_details["data"]
-			for label in data.keys():
-				d = data[label]
-				if plotfun == "plot":
-					plt.plot(d[0], d[1], label=label)
-				elif plotfun == "errorbar":
-					plt.errorbar(x=d[0], y=d[1], yerr=d[2], label=label)
-				elif plotfun == "scatter":
-					plt.scatter(x=d[0], y=d[1], label=label)
-				else:
-					raise Exception("Don't know how to plot " + plotfun)
-			plt.savefig(PLOT_DIR+basename+".png", bbox_inches='tight', dpi=300)
+				plotfun = plot_details["plot_type"]
+				data = plot_details["data"]
+				for label in data.keys():
+					d = data[label]
+					if plotfun == "plot":
+						plt.plot(d[0], d[1], label=label)
+					elif plotfun == "errorbar":
+						plt.errorbar(x=d[0], y=d[1], yerr=d[2], label=label)
+					elif plotfun == "scatter":
+						plt.scatter(x=d[0], y=d[1], label=label)
+					else:
+						raise Exception("Don't know how to plot " + plotfun)
+				if len(data.keys()) > 1: plt.legend()
+				plt.savefig(PLOT_DIR+basename+".png", bbox_inches='tight', dpi=300)
+			except Exception as e:
+				print("Error while plotting from", PLOT_DATA_DIR+data_file, "\n ", str(e))

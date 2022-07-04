@@ -1,5 +1,5 @@
 {
- "title": "Accuracy vs Time of tracking (14 objects, 4 targets, sigma=2)",
+ "title": "Accuracy vs Time of tracking\n(14 objects, 4 targets, sigma=2)",
  "xlabel": "Number of time steps",
  "ylabel": "Accuracy",
  "plot_type": "errorbar",
