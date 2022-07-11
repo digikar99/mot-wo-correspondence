@@ -37,6 +37,11 @@ class MultiDict:
 			raise StopIteration
 	def __contains__(self, key):
 		return key in self.storage
+	def __len__(self):
+		length = 0
+		for key in self.storage:
+			length += len(self.storage[key])
+		return length
 
 if __name__=="__main__":
 	a = MultiDict()

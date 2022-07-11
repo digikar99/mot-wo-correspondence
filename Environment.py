@@ -13,15 +13,15 @@ def rand2d(max_x, max_y):
 
 class Environment:
 	def __init__(self, shape, object_type_count_map, num_targets, location_object_map=None,
-				 location_property_map=None, target_locations=None):
-		self.shape                 = shape
-		self.object_type_count_map = object_type_count_map
-		self.num_objects           = sum(object_type_count_map.values())
-		self.num_object_types      = len(object_type_count_map)
-		self.location_object_map   = location_object_map
-		self.location_property_map = location_property_map
-		self.target_locations      = target_locations
-		self.num_targets           = num_targets
+				 location_property_map=None, target_location_id_map=None):
+		self.shape                  = shape
+		self.object_type_count_map  = object_type_count_map
+		self.num_objects            = sum(object_type_count_map.values())
+		self.num_object_types       = len(object_type_count_map)
+		self.location_object_map    = location_object_map
+		self.location_property_map  = location_property_map
+		self.target_location_id_map = target_location_id_map
+		self.num_targets            = num_targets
 	def initialize_random(self):
 		object_type_count_map = self.object_type_count_map
 		location_object_map   = MultiDict()
@@ -38,15 +38,21 @@ class Environment:
 				loc = rand2d(maxx, maxy)
 				location_object_map[loc] = object_type
 		self.location_object_map = location_object_map
+
 		object_locations = self.get_object_locations()
 		random.shuffle(object_locations)
-		self.target_locations = object_locations[:num_targets]
+		target_location_id_map = MultiDict()
+		for i in range(num_targets):
+			loc = object_locations[i]
+			target_location_id_map[loc] = i
+		self.target_location_id_map = target_location_id_map
 	def update_object_map(self):
 		raise Exception("Unimplemented method. Please subclass, and implement this method.")
 
 	def get_location_object_map(self): return self.location_object_map
 	def get_object_locations(self): return list(self.location_object_map.keys())
-	def get_target_locations(self): return self.target_locations
+	def get_target_location_id_map(self): return self.target_location_id_map
+	def get_target_locations(self): return self.target_location_id_map.keys()
 
 	def get_nearest_object_locations(self, loc):
 		object_locations = self.get_object_locations()
@@ -78,13 +84,14 @@ class OrnsteinUhlenbeckEnvironment(Environment):
 
 	def update_object_map(self):
 		k, lm, sigma = self.k, self.lm, self.sigma
-		location_property_map = self.location_property_map
-		location_object_map   = self.location_object_map
-		target_locations      = self.target_locations
+		location_property_map  = self.location_property_map
+		location_object_map    = self.location_object_map
+		target_location_id_map = self.target_location_id_map
+		target_locations       = self.get_target_locations()
 		maxi, maxj = self.shape
-		new_location_object_map   = MultiDict()
-		new_location_property_map = MultiDict()
-		new_target_locations      = list()
+		new_location_object_map    = MultiDict()
+		new_location_property_map  = MultiDict()
+		new_target_location_id_map = MultiDict()
 
 		# print("Prop map:", [x for x in location_property_map])
 
@@ -106,11 +113,11 @@ class OrnsteinUhlenbeckEnvironment(Environment):
 			new_location_property_map[newloc] = (x, y, newvx, newvy)
 			if loc in target_locations:
 				# print("  ", loc, newloc)
-				new_target_locations.append(newloc)
+				new_target_location_id_map[newloc] = target_location_id_map[loc]
 				target_locations.remove(loc)
 
 		# print(self.num_targets, location_property_map.keys(), new_target_locations, sep="\n")
-		assert len(new_target_locations) == len(new_target_locations)
-		self.location_object_map   = new_location_object_map
-		self.location_property_map = new_location_property_map
-		self.target_locations      = new_target_locations
+		# assert len(new_target_locations) == len(new_target_locations)
+		self.location_object_map    = new_location_object_map
+		self.location_property_map  = new_location_property_map
+		self.target_location_id_map = new_target_location_id_map

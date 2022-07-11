@@ -1,6 +1,9 @@
 
 import numpy as np
+import random
+import matplotlib as mpl
 import matplotlib.pyplot as plt
+from cycler import cycler
 
 from tasks import simulate_mot, simulate_mit
 # from OUSpeedOnSameGrid import simulate
@@ -147,7 +150,7 @@ def plot_acc_wrt_targets(
 
 
 def plot_acc_wrt_time(
-		grid_side, num_simulations, max_time, num_objects, num_targets,
+		grid_side, num_simulations, max_time_steps, num_objects, num_targets,
 		k, lm, sigma,
 		per_target_attention=None,
 		nearest_object_bound=None,
@@ -163,7 +166,7 @@ def plot_acc_wrt_time(
 	our_nob_accuracy_list  = []
 	our_nob_accuracy_list_se = []
 	num_time_steps_list    = []
-	for num_time_steps in range(10, max_time, (max_time-10)//5):
+	for num_time_steps in range(10, max_time_steps, (max_time_steps-10)//5):
 		momit_accuracies, our_accuracies = \
 			simulate_mot(grid_side, num_simulations, num_time_steps, num_objects, num_targets,
 						 k = k, lm = lm, sigma = sigma,
@@ -348,6 +351,289 @@ def plot_mot_mit_wrt_targets(
 	)
 
 
+def plot_mot_id_wrt_targets(
+		grid_side, num_simulations, max_num_targets, num_objects, num_time_steps,
+		k, lm, sigma,
+		per_target_attention=None,
+		nearest_object_bound=None,
+		update_strategy="random"
+):
+	"""
+	Plots percentage of targets that were tracked wrt time
+	"""
+	momit_mot_accuracy_list      = []
+	momit_mot_accuracy_list_se   = []
+	our_nob_mot_accuracy_list    = []
+	our_nob_mot_accuracy_list_se = []
+
+	momit_static_id_accuracy_list      = []
+	momit_static_id_accuracy_list_se   = []
+
+	momit_nonstatic_id_accuracy_list    = []
+	momit_nonstatic_id_accuracy_list_se = []
+
+	our_nob_id_accuracy_list    = []
+	our_nob_id_accuracy_list_se = []
+
+	num_targets_list = []
+
+	for num_targets in range(1, max_num_targets+1):
+		momit_mot_accuracies, our_nob_mot_accuracies, momit_static_id_accuracies, our_nob_id_accuracies = \
+			simulate_mot(grid_side, num_simulations, num_time_steps, num_objects, num_targets,
+						 k = k, lm = lm, sigma = sigma,
+						 per_target_attention = per_target_attention,
+						 nearest_object_bound = nearest_object_bound,
+						 update_strategy = update_strategy,
+						 return_id_accuracy = True,
+						 use_static_indices = True)
+
+		_, _ , momit_nonstatic_id_accuracies, _ = \
+			simulate_mot(grid_side, num_simulations, num_time_steps, num_objects, num_targets,
+						 k = k, lm = lm, sigma = sigma,
+						 per_target_attention = per_target_attention,
+						 nearest_object_bound = nearest_object_bound,
+						 update_strategy = update_strategy,
+						 return_id_accuracy = True,
+						 use_static_indices = False)
+
+
+		momit_mot_accuracy_list.append(np.mean(momit_mot_accuracies))
+		momit_mot_accuracy_list_se.append(np.std(momit_mot_accuracies, ddof=1)/np.sqrt(num_simulations))
+
+		our_nob_mot_accuracy_list.append(np.mean(our_nob_mot_accuracies))
+		our_nob_mot_accuracy_list_se.append(
+			np.std(our_nob_mot_accuracies, ddof=1)/np.sqrt(num_simulations)
+		)
+
+		momit_static_id_accuracy_list.append(np.mean(momit_static_id_accuracies))
+		momit_static_id_accuracy_list_se.append(
+			np.std(momit_static_id_accuracies, ddof=1)/np.sqrt(num_simulations)
+		)
+
+		momit_nonstatic_id_accuracy_list.append(np.mean(momit_nonstatic_id_accuracies))
+		momit_nonstatic_id_accuracy_list_se.append(
+			np.std(momit_nonstatic_id_accuracies, ddof=1)/np.sqrt(num_simulations)
+		)
+
+		our_nob_id_accuracy_list.append(np.mean(our_nob_id_accuracies))
+		our_nob_id_accuracy_list_se.append(
+			np.std(our_nob_id_accuracies, ddof=1)/np.sqrt(num_simulations)
+		)
+
+		num_targets_list.append(num_targets)
+
+	num_targets_list                    = np.asarray(num_targets_list)
+	momit_mot_accuracy_list             = 100*np.asarray(momit_mot_accuracy_list)
+	momit_mot_accuracy_list_se          = 100*np.asarray(momit_mot_accuracy_list_se)
+	our_nob_mot_accuracy_list           = 100*np.asarray(our_nob_mot_accuracy_list)
+	our_nob_mot_accuracy_list_se        = 100*np.asarray(our_nob_mot_accuracy_list_se)
+	momit_static_id_accuracy_list       = 100*np.asarray(momit_static_id_accuracy_list)
+	momit_static_id_accuracy_list_se    = 100*np.asarray(momit_static_id_accuracy_list_se)
+	momit_nonstatic_id_accuracy_list    = 100*np.asarray(momit_nonstatic_id_accuracy_list)
+	momit_nonstatic_id_accuracy_list_se = 100*np.asarray(momit_nonstatic_id_accuracy_list_se)
+	our_nob_id_accuracy_list            = 100*np.asarray(our_nob_id_accuracy_list)
+	our_nob_id_accuracy_list_se         = 100*np.asarray(our_nob_id_accuracy_list_se)
+
+	filename = get_filename(
+		"accuracy-targets-mot-id",
+		per_target_attention = per_target_attention,
+		nearest_object_bound = nearest_object_bound,
+		update_strategy = update_strategy
+	)
+	print(filename)
+
+	plt.clf()
+	markercycle = cycler(marker=['o', '^', 's', '*', 'P', 'd'])
+	colorcycle = cycler(color=plt.rcParams['axes.prop_cycle'].by_key()['color'][:6])
+	plt.gca().set_prop_cycle(colorcycle + markercycle)
+	mpl.rcParams["lines.markersize"] = 10
+	plt.errorbar(num_targets_list, momit_mot_accuracy_list, momit_mot_accuracy_list_se,
+				 label="MOMIT Tracking Accuracy")
+	plt.errorbar(num_targets_list, our_nob_mot_accuracy_list, our_nob_mot_accuracy_list_se,
+				 label="Our Tracking Accuracy (with nob)")
+	plt.errorbar(num_targets_list, momit_static_id_accuracy_list, momit_static_id_accuracy_list_se,
+				 label="MOMIT ID Accuracy (static indices)")
+	plt.errorbar(num_targets_list, momit_nonstatic_id_accuracy_list,
+				 momit_nonstatic_id_accuracy_list_se,
+				 label="MOMIT ID Accuracy (nonstatic indices)")
+	plt.errorbar(num_targets_list, our_nob_id_accuracy_list, our_nob_id_accuracy_list_se,
+				 label="Our ID Accuracy (with nob)")
+	plt.xlabel("Number of Targets ({0} objects)".format(num_objects))
+	plt.ylabel("Accuracy")
+	plt.ylim(0,100)
+	plt.legend()
+	plt.show()
+
+	write_plot_file(
+		filename = filename,
+		title  = "Accuracy vs Number of targets",
+		xlabel = "Number of Targets ({0} objects)".format(num_objects),
+		ylabel = "Accuracy",
+		ylim = [0,100],
+		plot_type = "errorbar",
+		data = {
+			"MOMIT Tracking Accuracy": [
+				num_targets_list, momit_mot_accuracy_list, momit_mot_accuracy_list_se
+			],
+			"Our Tracking Accuracy (with nob)": [
+				num_targets_list, our_nob_mot_accuracy_list, our_nob_mot_accuracy_list_se
+			],
+			"MOMIT ID Accuracy (static indices)": [
+				num_targets_list, momit_static_id_accuracy_list, momit_static_id_accuracy_list_se
+			],
+			"MOMIT ID Accuracy (nonstatic indices)": [
+				num_targets_list, momit_nonstatic_id_accuracy_list,
+				momit_nonstatic_id_accuracy_list_se
+			],
+			"Our ID Accuracy (with nob)": [
+				num_targets_list, our_nob_id_accuracy_list, our_nob_id_accuracy_list_se
+			]
+		}
+	)
+
+
+
+def plot_mot_id_wrt_time(
+		grid_side, num_simulations, max_time_steps, num_objects, num_targets,
+		k, lm, sigma,
+		per_target_attention=None,
+		nearest_object_bound=None,
+		update_strategy="random"
+):
+	"""
+	Plots percentage of targets that were tracked wrt time
+	"""
+	momit_mot_accuracy_list      = []
+	momit_mot_accuracy_list_se   = []
+	our_nob_mot_accuracy_list    = []
+	our_nob_mot_accuracy_list_se = []
+
+	momit_static_id_accuracy_list      = []
+	momit_static_id_accuracy_list_se   = []
+
+	momit_nonstatic_id_accuracy_list    = []
+	momit_nonstatic_id_accuracy_list_se = []
+
+	our_nob_id_accuracy_list    = []
+	our_nob_id_accuracy_list_se = []
+
+	num_time_steps_list = []
+
+	for num_time_steps in range(10, max_time_steps, (max_time_steps-10)//5):
+		momit_mot_accuracies, our_nob_mot_accuracies, momit_static_id_accuracies, our_nob_id_accuracies = \
+			simulate_mot(grid_side, num_simulations, num_time_steps, num_objects, num_targets,
+						 k = k, lm = lm, sigma = sigma,
+						 per_target_attention = per_target_attention,
+						 nearest_object_bound = nearest_object_bound,
+						 update_strategy = update_strategy,
+						 return_id_accuracy = True,
+						 use_static_indices = True)
+
+		_, _ , momit_nonstatic_id_accuracies, _ = \
+			simulate_mot(grid_side, num_simulations, num_time_steps, num_objects, num_targets,
+						 k = k, lm = lm, sigma = sigma,
+						 per_target_attention = per_target_attention,
+						 nearest_object_bound = nearest_object_bound,
+						 update_strategy = update_strategy,
+						 return_id_accuracy = True,
+						 use_static_indices = False)
+
+
+		momit_mot_accuracy_list.append(np.mean(momit_mot_accuracies))
+		momit_mot_accuracy_list_se.append(np.std(momit_mot_accuracies, ddof=1)/np.sqrt(num_simulations))
+
+		our_nob_mot_accuracy_list.append(np.mean(our_nob_mot_accuracies))
+		our_nob_mot_accuracy_list_se.append(
+			np.std(our_nob_mot_accuracies, ddof=1)/np.sqrt(num_simulations)
+		)
+
+		momit_static_id_accuracy_list.append(np.mean(momit_static_id_accuracies))
+		momit_static_id_accuracy_list_se.append(
+			np.std(momit_static_id_accuracies, ddof=1)/np.sqrt(num_simulations)
+		)
+
+		momit_nonstatic_id_accuracy_list.append(np.mean(momit_nonstatic_id_accuracies))
+		momit_nonstatic_id_accuracy_list_se.append(
+			np.std(momit_nonstatic_id_accuracies, ddof=1)/np.sqrt(num_simulations)
+		)
+
+		our_nob_id_accuracy_list.append(np.mean(our_nob_id_accuracies))
+		our_nob_id_accuracy_list_se.append(
+			np.std(our_nob_id_accuracies, ddof=1)/np.sqrt(num_simulations)
+		)
+
+		num_time_steps_list.append(num_time_steps)
+
+	num_time_steps_list                 = np.asarray(num_time_steps_list)
+	momit_mot_accuracy_list             = 100*np.asarray(momit_mot_accuracy_list)
+	momit_mot_accuracy_list_se          = 100*np.asarray(momit_mot_accuracy_list_se)
+	our_nob_mot_accuracy_list           = 100*np.asarray(our_nob_mot_accuracy_list)
+	our_nob_mot_accuracy_list_se        = 100*np.asarray(our_nob_mot_accuracy_list_se)
+	momit_static_id_accuracy_list       = 100*np.asarray(momit_static_id_accuracy_list)
+	momit_static_id_accuracy_list_se    = 100*np.asarray(momit_static_id_accuracy_list_se)
+	momit_nonstatic_id_accuracy_list    = 100*np.asarray(momit_nonstatic_id_accuracy_list)
+	momit_nonstatic_id_accuracy_list_se = 100*np.asarray(momit_nonstatic_id_accuracy_list_se)
+	our_nob_id_accuracy_list            = 100*np.asarray(our_nob_id_accuracy_list)
+	our_nob_id_accuracy_list_se         = 100*np.asarray(our_nob_id_accuracy_list_se)
+
+	filename = get_filename(
+		"accuracy-time-mot-id",
+		per_target_attention = per_target_attention,
+		nearest_object_bound = nearest_object_bound,
+		update_strategy = update_strategy
+	)
+	print(filename)
+
+	plt.clf()
+	markercycle = cycler(marker=['o', '^', 's', '*', 'P', 'd'])
+	colorcycle = cycler(color=plt.rcParams['axes.prop_cycle'].by_key()['color'][:6])
+	plt.gca().set_prop_cycle(colorcycle + markercycle)
+	mpl.rcParams["lines.markersize"] = 10
+	plt.errorbar(num_time_steps_list, momit_mot_accuracy_list, momit_mot_accuracy_list_se,
+				 label="MOMIT Tracking Accuracy")
+	plt.errorbar(num_time_steps_list, our_nob_mot_accuracy_list, our_nob_mot_accuracy_list_se,
+				 label="Our Tracking Accuracy (with nob)")
+	plt.errorbar(num_time_steps_list, momit_static_id_accuracy_list, momit_static_id_accuracy_list_se,
+				 label="MOMIT ID Accuracy (static indices)")
+	plt.errorbar(num_time_steps_list, momit_nonstatic_id_accuracy_list,
+				 momit_nonstatic_id_accuracy_list_se,
+				 label="MOMIT ID Accuracy (nonstatic indices)")
+	plt.errorbar(num_time_steps_list, our_nob_id_accuracy_list, our_nob_id_accuracy_list_se,
+				 label="Our ID Accuracy (with nob)")
+	plt.xlabel("Number of Time Steps (Trial Duration)")
+	plt.ylabel("Accuracy")
+	plt.ylim(0,100)
+	plt.legend()
+	plt.show()
+
+	write_plot_file(
+		filename = filename,
+		title = "Accuracy vs Trial Duration",
+		xlabel = "Number of Time Steps (Trial Duration)",
+		ylabel = "Accuracy",
+		ylim = [0,100],
+		plot_type = "errorbar",
+		data = {
+			"MOMIT Tracking Accuracy": [
+				num_time_steps_list, momit_mot_accuracy_list, momit_mot_accuracy_list_se
+			],
+			"Our Tracking Accuracy (with nob)": [
+				num_time_steps_list, our_nob_mot_accuracy_list, our_nob_mot_accuracy_list_se
+			],
+			"MOMIT ID Accuracy (static indices)": [
+				num_time_steps_list, momit_static_id_accuracy_list, momit_static_id_accuracy_list_se
+			],
+			"MOMIT ID Accuracy (nonstatic indices)": [
+				num_time_steps_list, momit_nonstatic_id_accuracy_list,
+				momit_nonstatic_id_accuracy_list_se
+			],
+			"Our ID Accuracy (with nob)": [
+				num_time_steps_list, our_nob_id_accuracy_list, our_nob_id_accuracy_list_se
+			]
+		}
+	)
+
+
 
 def plot_sigma_wrt_targets(
 		base_grid_side,
@@ -389,9 +675,9 @@ def plot_sigma_wrt_targets(
 							 nearest_object_bound = nearest_object_bound,
 							 update_strategy=update_strategy)
 
-			momit_accuracy = np.mean(momit_accuracies)*100
-			our_accuracy   = np.mean(our_accuracies)*100
-			our_nob_accuracy   = np.mean(our_nob_accuracies)*100
+			momit_accuracy   = np.mean(momit_accuracies)*100
+			our_accuracy     = np.mean(our_accuracies)*100
+			our_nob_accuracy = np.mean(our_nob_accuracies)*100
 
 			print(num_targets, sigma, momit_accuracy, our_accuracy)
 
@@ -693,18 +979,19 @@ def plot_nearest_object_benefit(
 
 if __name__ == "__main__":
 	np.random.seed(42)
-	momit_acc, our_acc = simulate_mot(
-		grid_side = 720,
-		num_simulations = 10,
-		num_time_steps = 50,
-		num_objects = 14,
-		num_targets = 4,
-		k = 0.0005,
-		lm = 0.9,
-		sigma = 4
-	)
-	print(momit_acc)
-	print(our_acc)
+	# random.seed(43)
+	# momit_acc, our_acc = simulate_mot(
+	# 	grid_side = 720,
+	# 	num_simulations = 10,
+	# 	num_time_steps = 50,
+	# 	num_objects = 14,
+	# 	num_targets = 4,
+	# 	k = 0.0005,
+	# 	lm = 0.9,
+	# 	sigma = 4
+	# )
+	# print(momit_acc)
+	# print(our_acc)
 
 	# # SECTION 1: Accuracy vs Number of Targets =================================
 	# plot_acc_wrt_targets(
@@ -724,7 +1011,7 @@ if __name__ == "__main__":
 	# plot_acc_wrt_time(
 	# 	grid_side = 720,
 	# 	num_simulations = 100,
-	# 	max_time = 50,
+	# 	max_time_steps = 50,
 	# 	num_objects = 14,
 	# 	num_targets = 4,
 	# 	k = 0.0005,
@@ -751,15 +1038,58 @@ if __name__ == "__main__":
 	# )
 
 	# SECTION 4: MOT vs MIT Accuracy ===========================================
-	plot_mot_mit_wrt_targets(
+	# plot_mot_mit_wrt_targets(
+	# 	grid_side = 720,
+	# 	num_simulations = 50,
+	# 	num_time_steps = 50,
+	# 	num_objects = 14,
+	# 	max_num_targets = 8,
+	# 	k = 0.0005,
+	# 	lm = 0.9,
+	# 	sigma = 4,
+	# 	update_strategy="lowest",
+	# 	nearest_object_bound=30,
+	# )
+
+	# SECTION 5: Tracking vs ID Accuracy =======================================
+	# print(
+	# 	simulate_mot(
+	# 		grid_side = 720,
+	# 		num_simulations = 2,
+	# 		num_time_steps = 10,
+	# 		num_objects = 14,
+	# 		num_targets = 4,
+	# 		k = 0.0005,
+	# 		lm = 0.9,
+	# 		sigma = 2,
+	# 		update_strategy = "lowest",
+	# 		return_id_accuracy = True,
+	# 		use_static_indices = False
+	# 	)
+	# )
+
+	# plot_mot_id_wrt_targets(
+	# 	grid_side = 720,
+	# 	num_simulations = 50,
+	# 	num_time_steps = 50,
+	# 	num_objects = 14,
+	# 	max_num_targets = 8,
+	# 	k = 0.0005,
+	# 	lm = 0.9,
+	# 	sigma = 2,
+	# 	update_strategy="lowest",
+	# 	nearest_object_bound=30,
+	# )
+
+	plot_mot_id_wrt_time(
 		grid_side = 720,
 		num_simulations = 50,
-		num_time_steps = 50,
+		max_time_steps = 100,
 		num_objects = 14,
-		max_num_targets = 8,
+		num_targets = 4,
 		k = 0.0005,
 		lm = 0.9,
-		sigma = 4,
+		sigma = 2,
 		update_strategy="lowest",
 		nearest_object_bound=30,
 	)

@@ -4,7 +4,7 @@ from MOMIT import MOMIT
 from OurMOTModel import OurMOTModel
 
 
-def evaluate(env, model):
+def evaluate_tracking(env, model):
 	true_target_locations = env.get_target_locations()
 	num_targets           = env.num_targets
 	assert num_targets == len(true_target_locations), "{0}, {1}".format(num_targets, true_target_locations)
@@ -43,12 +43,47 @@ Num targets: {0}
 	return accuracy
 
 
+def evaluate_id(env, model):
+	"Returns proportions of IDs that were correctly labelled"
+	true_target_locations = env.get_target_locations()
+	num_targets           = env.num_targets
+	assert num_targets == len(true_target_locations), "{0}, {1}".format(num_targets, true_target_locations)
+
+	# Ensure that attended locations actually correspond to objects
+	for _ in range(num_targets): model.process_env(env)
+
+	predicted_id_map = model.get_target_location_id_map(env)
+	true_id_map = env.get_target_location_id_map()
+
+	# print(model)
+	# print(predicted_id_map.keys())
+	# print(true_id_map.keys())
+
+	num_correct = 0
+	num_total   = len(true_id_map)
+	# print("id evaluation:")
+	# print(predicted_id_map.keys())
+	# print(true_id_map.keys())
+	for loc in predicted_id_map:
+		if loc in true_id_map:
+			# print("  ", loc, "in both")
+			predicted_id = predicted_id_map[loc]
+			true_id = true_id_map[loc]
+			# print("   Predicted ID:", predicted_id, "  True ID:", true_id)
+			if predicted_id == true_id: num_correct += 1
+	return num_correct/num_total
+
+
 def simulate_mot(grid_side, num_simulations, num_time_steps, num_objects,
 				 num_targets, k, lm, sigma, episodic_buffer_size=4, episodic_buffer_decay_rate=0.9,
-				 per_target_attention=None, nearest_object_bound=None, update_strategy="random"):
+				 per_target_attention=None, nearest_object_bound=None, update_strategy="random",
+				 return_id_accuracy=False, use_static_indices=True):
 
-	momit_accuracies = []
-	our_accuracies   = []
+	momit_tracking_accuracies = []
+	our_tracking_accuracies   = []
+
+	momit_id_accuracies = []
+	our_id_accuracies   = []
 
 	for _ in range(num_simulations):
 
@@ -59,23 +94,32 @@ def simulate_mot(grid_side, num_simulations, num_time_steps, num_objects,
 			k = k, lm = lm, sigma = sigma
 		)
 		env.initialize_random()
-		initial_target_locations = env.get_target_locations()
-		momit_model = MOMIT(episodic_buffer_size, episodic_buffer_decay_rate, {0: 0.2})
+		momit_model = MOMIT(episodic_buffer_size, episodic_buffer_decay_rate, {0: 0.2},
+							use_static_indices = use_static_indices)
 		our_model = OurMOTModel(
 			num_targets,
 			per_target_attention = per_target_attention,
 			nearest_object_bound = nearest_object_bound
 		)
-		momit_model.process_env(env, initial_target_locations)
-		our_model.process_env(env, initial_target_locations)
+		momit_model.process_env(env, observe_targets=True)
+		our_model.process_env(env, observe_targets=True)
+
 		for _ in range(num_time_steps):
 			env.update_object_map()
 			momit_model.process_env(env)
 			our_model.process_env(env, strategy=update_strategy)
-		momit_accuracies.append(evaluate(env, momit_model))
-		our_accuracies.append(evaluate(env, our_model))
 
-	return momit_accuracies, our_accuracies
+		momit_tracking_accuracies.append(evaluate_tracking(env, momit_model))
+		our_tracking_accuracies.append(evaluate_tracking(env, our_model))
+
+		momit_id_accuracies.append(evaluate_id(env, momit_model))
+		our_id_accuracies.append(evaluate_id(env, our_model))
+
+	if return_id_accuracy:
+		return momit_tracking_accuracies, our_tracking_accuracies, \
+			momit_id_accuracies, our_id_accuracies
+	else:
+		return momit_tracking_accuracies, our_tracking_accuracies
 
 
 def simulate_mit(grid_side, num_simulations, num_time_steps, num_objects,
@@ -100,21 +144,20 @@ def simulate_mit(grid_side, num_simulations, num_time_steps, num_objects,
 			k = k, lm = lm, sigma = sigma
 		)
 		env.initialize_random()
-		initial_target_locations = env.get_target_locations()
 		momit_model = MOMIT(episodic_buffer_size, episodic_buffer_decay_rate, object_type_cost)
 		our_model = OurMOTModel(
 			num_targets,
 			per_target_attention = per_target_attention,
 			nearest_object_bound = nearest_object_bound
 		)
-		momit_model.process_env(env, initial_target_locations)
-		our_model.process_env(env, initial_target_locations)
+		momit_model.process_env(env, observe_targets=True)
+		our_model.process_env(env, observe_targets=True)
 		for _ in range(num_time_steps):
 			env.update_object_map()
 			momit_model.process_env(env)
 			our_model.process_env(env, strategy=update_strategy)
-		momit_accuracies.append(evaluate(env, momit_model))
-		our_accuracies.append(evaluate(env, our_model))
+		momit_accuracies.append(evaluate_tracking(env, momit_model))
+		our_accuracies.append(evaluate_tracking(env, our_model))
 
 	return momit_accuracies, our_accuracies
 

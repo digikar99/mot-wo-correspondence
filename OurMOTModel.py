@@ -2,6 +2,7 @@
 from Environment import Environment
 import random
 import numpy as np
+from OurMultiDict import MultiDict
 
 class OurMOTModel:
 	def __init__(self, num_targets, per_target_attention=None, nearest_object_bound=None):
@@ -10,6 +11,7 @@ class OurMOTModel:
 			self.per_target_attention = [1,0.85,0.7,0.6,0.5,0.3,0.1,0.03][num_targets-1]
 		self.target_locations = None
 		self.nearest_object_bound = nearest_object_bound
+		self.target_id_sequence = None
 
 	@staticmethod
 	def nearest_object_heuristic(object_locations, i, j, bound=None):
@@ -23,9 +25,18 @@ class OurMOTModel:
 			if dist <= bound: return object_locations[0]
 			else: return random.choice(object_locations)
 
-	def process_env(self, env:Environment, target_locations=None, strategy="random"):
-		if target_locations is not None:
-			self.target_locations = target_locations.copy()
+	def process_env(self, env:Environment, observe_targets=False, strategy="random"):
+		if observe_targets:
+			# Use target information in env
+			target_locations = env.get_target_locations()
+			target_location_id_map = env.get_target_location_id_map()
+			target_locations = sorted(target_locations)
+			target_id_sequence = []
+			for loc in target_locations:
+				target_id_sequence.append(target_location_id_map[loc])
+			self.target_locations   = target_locations
+			self.target_id_sequence = target_id_sequence
+		# else: do not use target information in env
 		elif strategy == "random":
 			target_locations     = self.target_locations
 			object_locations     = env.get_object_locations()
@@ -84,3 +95,25 @@ class OurMOTModel:
 			num_guesses = num_locations - len(known_locations)
 			random.shuffle(unknown_locations)
 			return known_locations + unknown_locations[:num_guesses]
+
+	def get_target_location_id_map(self, env:Environment=None, num_targets=None):
+		target_location_id_map = MultiDict()
+		attended_locations = self.get_attended_locations(env)
+		attended_locations = sorted(attended_locations)
+		target_id_sequence = self.target_id_sequence
+		for (i, loc) in enumerate(attended_locations):
+			target_location_id_map[loc] = target_id_sequence[i]
+		if env is None or num_targets is None:
+			return target_location_id_map
+		else:
+			locations         = env.get_object_locations()
+			known_locations   = attended_locations
+			unknown_locations = list(set(locations) - set(known_locations))
+			num_guesses = num_targets - len(known_locations)
+			random.shuffle(unknown_locations)
+			index = len(target_location_id_map)
+			for i in range(num_guesses):
+				loc = unknown_locations[i]
+				target_location_id_map[loc] = index
+				index += 1
+			return target_location_id_map
