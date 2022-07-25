@@ -9,7 +9,7 @@ from tasks import simulate_mot, simulate_mit
 # from OUSpeedOnSameGrid import simulate
 import json
 
-PLOT_DIR = "plot-data/"
+PLOT_DIR = "plot-data-v2/"
 
 """
 
@@ -65,6 +65,357 @@ def get_filename(base_name,
 
 
 def plot_acc_wrt_targets(
+		grid_side, num_simulations, num_time_steps, num_objects, max_num_targets,
+		k, lm, sigma, per_target_attention=None,
+		nearest_object_bound=None, update_strategy="random"
+):
+	our_accuracy_list      = []
+	our_accuracy_list_se   = []
+	chance_accuracy_list  = []
+	chance_accuracy_list_se = []
+	num_target_list = []
+	for num_targets in range(1, max_num_targets+1):
+		_, our_accuracies = \
+			simulate_mot(grid_side, num_simulations, num_time_steps, num_objects, num_targets,
+						 k = k, lm = lm, sigma = sigma,
+						 per_target_attention = per_target_attention,
+						 nearest_object_bound = nearest_object_bound,
+						 update_strategy = update_strategy)
+		_, chance_accuracies = \
+			simulate_mot(grid_side, num_simulations, num_time_steps, num_objects, num_targets,
+						 k = k, lm = lm, sigma = sigma,
+						 per_target_attention = per_target_attention,
+						 nearest_object_bound = 0,
+						 update_strategy = update_strategy)
+
+		our_accuracy_list.append(np.mean(our_accuracies))
+		our_accuracy_list_se.append(np.std(our_accuracies, ddof=1)/np.sqrt(num_simulations))
+
+		chance_accuracy_list.append(np.mean(chance_accuracies))
+		chance_accuracy_list_se.append(np.std(chance_accuracies, ddof=1)/np.sqrt(num_simulations))
+
+		num_target_list.append(num_targets)
+
+	num_target_list     = np.asarray(num_target_list)
+	our_accuracy_list   = 100*np.asarray(our_accuracy_list)
+	our_accuracy_list_se = 100*np.asarray(our_accuracy_list_se)
+	chance_accuracy_list = 100*np.asarray(chance_accuracy_list)
+	chance_accuracy_list_se = 100*np.asarray(chance_accuracy_list_se)
+
+	filename = get_filename(
+		"accuracy-targets",
+		per_target_attention = per_target_attention,
+		nearest_object_bound = nearest_object_bound,
+		update_strategy = update_strategy
+	)
+	print(filename)
+
+	plt.clf()
+	plt.title("Accuracy vs Number of targets (sigma={0})".format(sigma))
+
+	plt.errorbar(num_target_list, our_accuracy_list, our_accuracy_list_se,
+				 label="Our Accuracy")
+	plt.errorbar(num_target_list, chance_accuracy_list, chance_accuracy_list_se,
+				 label="Chance Accuracy")
+	plt.xlabel("Number of targets ({0} objects)".format(num_objects))
+	plt.ylabel("Accuracy")
+	plt.ylim(0,100)
+	plt.legend()
+	plt.show()
+
+	write_plot_file(
+		filename = filename,
+		title = "Accuracy vs Number of targets (sigma={0})".format(sigma),
+		xlabel = "Number of targets ({0} objects)".format(num_objects),
+		ylabel = "Accuracy",
+		ylim = [0,100],
+		plot_type = "errorbar",
+		data = {
+			"Our Accuracy": [num_target_list, our_accuracy_list, our_accuracy_list_se],
+			"Chance Accuracy": [num_target_list, chance_accuracy_list, chance_accuracy_list_se]
+		}
+	)
+
+
+
+def plot_acc_wrt_time(
+		grid_side, num_simulations, max_time_steps, num_objects, num_targets,
+		k, lm, sigma,
+		per_target_attention=None,
+		nearest_object_bound=None,
+		update_strategy="random"
+):
+	"""
+	Plots percentage of targets that were tracked wrt time
+	"""
+	our_accuracy_list      = []
+	our_accuracy_list_se   = []
+	num_time_steps_list    = []
+	for num_time_steps in range(10, max_time_steps, (max_time_steps-10)//5):
+		_, our_accuracies = \
+			simulate_mot(grid_side, num_simulations, num_time_steps, num_objects, num_targets,
+						 k = k, lm = lm, sigma = sigma,
+						 nearest_object_bound = nearest_object_bound,
+						 per_target_attention = per_target_attention,
+						 update_strategy=update_strategy)
+
+		our_accuracy_list.append(np.mean(our_accuracies))
+		our_accuracy_list_se.append(np.std(our_accuracies, ddof=1)/np.sqrt(num_simulations))
+
+		num_time_steps_list.append(num_time_steps)
+
+	our_accuracy_list        = 100*np.asarray(our_accuracy_list)
+	our_accuracy_list_se     = 100*np.asarray(our_accuracy_list_se)
+
+	filename = get_filename(
+		"accuracy-time",
+		sigma = sigma,
+		per_target_attention = per_target_attention,
+		nearest_object_bound = nearest_object_bound,
+		update_strategy = update_strategy
+	)
+	print(filename)
+	plt.clf()
+	plt.errorbar(num_time_steps_list, our_accuracy_list, our_accuracy_list_se,
+				 label="Our Model")
+	plt.title("Accuracy vs Time of tracking\n({0} objects, {1} targets, sigma={2})"
+			  .format(num_objects, num_targets, sigma))
+	plt.xlabel("Number of time steps")
+	plt.ylabel("Accuracy")
+	plt.ylim(0,100)
+	plt.legend()
+	plt.show()
+	write_plot_file(
+		filename = filename,
+		title = "Accuracy vs Time of tracking\n({0} objects, {1} targets, sigma={2})"
+			.format(num_objects, num_targets, sigma),
+		xlabel = "Number of time steps",
+		ylabel = "Accuracy",
+		ylim = [0,100],
+		plot_type = "errorbar",
+		data = {
+			"Our Model": [
+				num_time_steps_list,
+				our_accuracy_list,
+				our_accuracy_list_se,
+			],
+		}
+	)
+
+	return our_accuracy_list
+
+
+def plot_acc_wrt_sigma(
+		grid_side, num_simulations, num_time_steps, num_objects, num_targets,
+		k, lm, max_sigma=None, sigma_list=None,
+		per_target_attention=None,
+		nearest_object_bound=None,
+		update_strategy="random"
+):
+	"""
+	Plots percentage of targets that were tracked wrt time
+	"""
+	our_accuracy_list      = []
+	our_accuracy_list_se   = []
+	chance_accuracy_list      = []
+	chance_accuracy_list_se   = []
+	min_sigma = 0.1
+	int_sigma = ((max_sigma - min_sigma)/10 if max_sigma is not None else None)
+	sigma_list = (np.arange(max_sigma,min_sigma,-int_sigma) if sigma_list is None else sigma_list)
+	for sigma in sigma_list:
+		_, our_accuracies = \
+			simulate_mot(grid_side, num_simulations, num_time_steps, num_objects, num_targets,
+						 k = k, lm = lm, sigma = sigma,
+						 nearest_object_bound = nearest_object_bound,
+						 per_target_attention = per_target_attention,
+						 update_strategy = update_strategy)
+		_, chance_accuracies = \
+			simulate_mot(grid_side, num_simulations, num_time_steps, num_objects, num_targets,
+						 k = k, lm = lm, sigma = sigma,
+						 nearest_object_bound = 0,
+						 per_target_attention = per_target_attention,
+						 update_strategy = update_strategy)
+
+		our_accuracy_list.append(np.mean(our_accuracies))
+		our_accuracy_list_se.append(np.std(our_accuracies, ddof=1)/np.sqrt(num_simulations))
+
+		chance_accuracy_list.append(np.mean(chance_accuracies))
+		chance_accuracy_list_se.append(np.std(chance_accuracies, ddof=1)/np.sqrt(num_simulations))
+
+
+	our_accuracy_list        = 100*np.asarray(our_accuracy_list)
+	our_accuracy_list_se     = 100*np.asarray(our_accuracy_list_se)
+	chance_accuracy_list     = 100*np.asarray(chance_accuracy_list)
+	chance_accuracy_list_se  = 100*np.asarray(chance_accuracy_list_se)
+
+	filename = get_filename(
+		"accuracy-sigma",
+		sigma = sigma,
+		per_target_attention = per_target_attention,
+		nearest_object_bound = nearest_object_bound,
+		update_strategy = update_strategy
+	)
+	print(filename)
+	plt.clf()
+	plt.errorbar(sigma_list, our_accuracy_list, our_accuracy_list_se,
+				 label="Our Model")
+	plt.errorbar(sigma_list, chance_accuracy_list, chance_accuracy_list_se,
+				 label="Chance Performance")
+	plt.title("Accuracy vs Object Speeds\n({0} objects, {1} targets)"
+			  .format(num_objects, num_targets))
+	plt.xlabel("Object Speed (sigma)")
+	plt.ylabel("Accuracy")
+	plt.ylim(0,100)
+	plt.legend()
+	plt.show()
+	write_plot_file(
+		filename = filename,
+		title = "Accuracy vs Object Speeds\n({0} objects, {1} targets)"\
+				.format(num_objects, num_targets),
+		xlabel = "Object Speed (sigma)",
+		ylabel = "Accuracy",
+		ylim = [0,100],
+		plot_type = "errorbar",
+		data = {
+			"Our Model": [
+				sigma_list,
+				our_accuracy_list,
+				our_accuracy_list_se,
+			],
+			"Chance Performance": [
+				sigma_list,
+				chance_accuracy_list,
+				chance_accuracy_list_se,
+			],
+		}
+	)
+
+	return our_accuracy_list
+
+
+def plot_momit_acc_wrt_sigma(
+		grid_side, num_simulations, num_time_steps, num_objects, num_targets,
+		k, lm, max_sigma=None, sigma_list=None,
+		per_target_attention=None,
+		nearest_object_bound=None,
+		update_strategy="random"
+):
+	"""
+	Plots percentage of targets that were tracked wrt time
+	"""
+	momit_accuracy_list    = []
+	momit_accuracy_list_se = []
+	our_accuracy_list      = []
+	our_accuracy_list_se   = []
+	our_nob_accuracy_list     = []
+	our_nob_accuracy_list_se  = []
+	chance_accuracy_list      = []
+	chance_accuracy_list_se   = []
+	min_sigma = 0.1
+	int_sigma = ((max_sigma - min_sigma)/10 if max_sigma is not None else None)
+	sigma_list = (np.arange(max_sigma,min_sigma,-int_sigma) if sigma_list is None else sigma_list)
+	for sigma in sigma_list:
+		momit_accuracies, our_nob_accuracies = \
+			simulate_mot(grid_side, num_simulations, num_time_steps, num_objects, num_targets,
+						 k = k, lm = lm, sigma = sigma,
+						 nearest_object_bound = nearest_object_bound,
+						 per_target_attention = per_target_attention,
+						 update_strategy = update_strategy)
+		_, our_accuracies = \
+			simulate_mot(grid_side, num_simulations, num_time_steps, num_objects, num_targets,
+						 k = k, lm = lm, sigma = sigma,
+						 nearest_object_bound = None,
+						 per_target_attention = per_target_attention,
+						 update_strategy = update_strategy)
+		_, chance_accuracies = \
+			simulate_mot(grid_side, num_simulations, num_time_steps, num_objects, num_targets,
+						 k = k, lm = lm, sigma = sigma,
+						 nearest_object_bound = 0,
+						 per_target_attention = per_target_attention,
+						 update_strategy = update_strategy)
+
+		momit_accuracy_list.append(np.mean(momit_accuracies))
+		momit_accuracy_list_se.append(np.std(momit_accuracies, ddof=1)/np.sqrt(num_simulations))
+
+		our_accuracy_list.append(np.mean(our_accuracies))
+		our_accuracy_list_se.append(np.std(our_accuracies, ddof=1)/np.sqrt(num_simulations))
+
+		our_nob_accuracy_list.append(np.mean(our_nob_accuracies))
+		our_nob_accuracy_list_se.append(np.std(our_nob_accuracies, ddof=1)/np.sqrt(num_simulations))
+
+		chance_accuracy_list.append(np.mean(chance_accuracies))
+		chance_accuracy_list_se.append(np.std(chance_accuracies, ddof=1)/np.sqrt(num_simulations))
+
+
+	momit_accuracy_list      = 100*np.asarray(momit_accuracy_list)
+	momit_accuracy_list_se   = 100*np.asarray(momit_accuracy_list_se)
+	our_accuracy_list        = 100*np.asarray(our_accuracy_list)
+	our_accuracy_list_se     = 100*np.asarray(our_accuracy_list_se)
+	our_nob_accuracy_list    = 100*np.asarray(our_nob_accuracy_list)
+	our_nob_accuracy_list_se = 100*np.asarray(our_nob_accuracy_list_se)
+	chance_accuracy_list     = 100*np.asarray(chance_accuracy_list)
+	chance_accuracy_list_se  = 100*np.asarray(chance_accuracy_list_se)
+
+	filename = get_filename(
+		"accuracy-sigma-momit",
+		sigma = sigma,
+		per_target_attention = per_target_attention,
+		nearest_object_bound = nearest_object_bound,
+		update_strategy = update_strategy
+	)
+	print(filename)
+	plt.clf()
+	plt.errorbar(sigma_list, momit_accuracy_list, momit_accuracy_list_se,
+				 label="MOMIT")
+	plt.errorbar(sigma_list, our_accuracy_list, our_accuracy_list_se,
+				 label="Our Model (w/o nob)")
+	plt.errorbar(sigma_list, our_nob_accuracy_list, our_nob_accuracy_list_se,
+				 label="Our Model (with nob)")
+	plt.errorbar(sigma_list, chance_accuracy_list, chance_accuracy_list_se,
+				 label="Chance Performance")
+	plt.title("Accuracy vs Object Speeds\n({0} objects, {1} targets)"
+			  .format(num_objects, num_targets))
+	plt.xlabel("Object Speed (sigma)")
+	plt.ylabel("Accuracy")
+	plt.ylim(0,100)
+	plt.legend()
+	plt.show()
+	write_plot_file(
+		filename = filename,
+		title = "Accuracy vs Object Speeds\n({0} objects, {1} targets)"\
+				.format(num_objects, num_targets),
+		xlabel = "Object Speed (sigma)",
+		ylabel = "Accuracy",
+		ylim = [0,100],
+		plot_type = "errorbar",
+		data = {
+			"MOMIT": [
+				sigma_list,
+				momit_accuracy_list,
+				momit_accuracy_list_se,
+			],
+			"Our Model (w/o nob)": [
+				sigma_list,
+				our_accuracy_list,
+				our_accuracy_list_se,
+			],
+			"Our Model (with nob)": [
+				sigma_list,
+				our_nob_accuracy_list,
+				our_nob_accuracy_list_se,
+			],
+			"Chance Performance": [
+				sigma_list,
+				chance_accuracy_list,
+				chance_accuracy_list_se,
+			],
+		}
+	)
+
+	return our_accuracy_list
+
+
+def plot_momit_acc_wrt_targets(
 		grid_side, num_simulations, num_time_steps, num_objects, max_num_targets,
 		k, lm, sigma, per_target_attention=None, last_step_uses_nearest_object=True,
 		nearest_object_bound=None, update_strategy="random"
@@ -147,9 +498,7 @@ def plot_acc_wrt_targets(
 	return momit_accuracy_list, our_accuracy_list
 
 
-
-
-def plot_acc_wrt_time(
+def plot_momit_acc_wrt_time(
 		grid_side, num_simulations, max_time_steps, num_objects, num_targets,
 		k, lm, sigma,
 		per_target_attention=None,
@@ -247,6 +596,363 @@ def plot_acc_wrt_time(
 	)
 
 	return momit_accuracy_list, our_accuracy_list
+
+
+def plot_both_acc_wrt_targets(
+		grid_side, num_simulations, num_time_steps, num_objects, max_num_targets,
+		k, lm, sigma, per_target_attention=None, last_step_uses_nearest_object=True,
+		nearest_object_bound=None
+):
+	seq_accuracy_list      = []
+	seq_accuracy_list_se   = []
+	parallel_accuracy_list  = []
+	parallel_accuracy_list_se = []
+	chance_accuracy_list    = []
+	chance_accuracy_list_se = []
+	num_target_list = []
+	for num_targets in range(1, max_num_targets+1):
+		_, seq_accuracies = \
+			simulate_mot(grid_side, num_simulations, num_time_steps, num_objects, num_targets,
+						 k = k, lm = lm, sigma = sigma,
+						 per_target_attention = per_target_attention,
+						 nearest_object_bound = nearest_object_bound,
+						 update_strategy = "lowest")
+		_, parallel_accuracies = \
+			simulate_mot(grid_side, num_simulations, num_time_steps, num_objects, num_targets,
+						 k = k, lm = lm, sigma = sigma,
+						 per_target_attention = per_target_attention,
+						 nearest_object_bound = nearest_object_bound,
+						 update_strategy = "random")
+		_, chance_accuracies = \
+			simulate_mot(grid_side, num_simulations, num_time_steps, num_objects, num_targets,
+						 k = k, lm = lm, sigma = sigma,
+						 per_target_attention = per_target_attention,
+						 nearest_object_bound = 0,
+						 update_strategy = "random")
+
+		seq_accuracy_list.append(np.mean(seq_accuracies))
+		seq_accuracy_list_se.append(np.std(seq_accuracies, ddof=1)/np.sqrt(num_simulations))
+
+		parallel_accuracy_list.append(np.mean(parallel_accuracies))
+		parallel_accuracy_list_se.append(np.std(parallel_accuracies, ddof=1)/np.sqrt(num_simulations))
+
+		chance_accuracy_list.append(np.mean(chance_accuracies))
+		chance_accuracy_list_se.append(np.std(chance_accuracies, ddof=1)/np.sqrt(num_simulations))
+
+		num_target_list.append(num_targets)
+
+	num_target_list     = np.asarray(num_target_list)
+	seq_accuracy_list   = 100*np.asarray(seq_accuracy_list)
+	seq_accuracy_list_se = 100*np.asarray(seq_accuracy_list_se)
+	parallel_accuracy_list = 100*np.asarray(parallel_accuracy_list)
+	parallel_accuracy_list_se = 100*np.asarray(parallel_accuracy_list_se)
+	chance_accuracy_list = 100*np.asarray(chance_accuracy_list)
+	chance_accuracy_list_se = 100*np.asarray(chance_accuracy_list_se)
+
+	filename = get_filename(
+		"accuracy-targets-both",
+		per_target_attention = per_target_attention,
+		nearest_object_bound = nearest_object_bound,
+	)
+	print(filename)
+
+	plt.clf()
+	plt.errorbar(num_target_list, seq_accuracy_list, seq_accuracy_list_se,
+				 label="Sequential Strategy")
+	plt.errorbar(num_target_list, parallel_accuracy_list, parallel_accuracy_list_se,
+				 label="Parallel Strategy")
+	plt.errorbar(num_target_list, chance_accuracy_list, chance_accuracy_list_se,
+				 label="Chance Performance")
+	plt.xlabel("Number of targets ({0} objects)".format(num_objects))
+	plt.ylabel("Accuracy")
+	plt.ylim(0,100)
+	plt.legend()
+	plt.show()
+
+	write_plot_file(
+		filename = filename,
+		title = "Accuracy vs Number of targets",
+		xlabel = "Number of targets ({0} objects)".format(num_objects),
+		ylabel = "Accuracy",
+		ylim = [0,100],
+		plot_type = "errorbar",
+		data = {
+			"Sequential Strategy": [num_target_list, seq_accuracy_list, seq_accuracy_list_se],
+			"Parallel Strategy": [num_target_list, parallel_accuracy_list, parallel_accuracy_list_se],
+			"Chance Performance": [num_target_list, chance_accuracy_list, chance_accuracy_list_se]
+		}
+	)
+
+
+def plot_both_acc_wrt_time(
+		grid_side, num_simulations, max_time_steps, num_objects, num_targets,
+		k, lm, sigma, per_target_attention=None, last_step_uses_nearest_object=True,
+		nearest_object_bound=None
+):
+	seq_accuracy_list      = []
+	seq_accuracy_list_se   = []
+	parallel_accuracy_list  = []
+	parallel_accuracy_list_se = []
+	num_time_steps_list    = []
+	for num_time_steps in range(10, max_time_steps, (max_time_steps-10)//5):
+		_, seq_accuracies = \
+			simulate_mot(grid_side, num_simulations, num_time_steps, num_objects, num_targets,
+						 k = k, lm = lm, sigma = sigma,
+						 per_target_attention = per_target_attention,
+						 nearest_object_bound = nearest_object_bound,
+						 update_strategy = "lowest")
+		_, parallel_accuracies = \
+			simulate_mot(grid_side, num_simulations, num_time_steps, num_objects, num_targets,
+						 k = k, lm = lm, sigma = sigma,
+						 per_target_attention = per_target_attention,
+						 nearest_object_bound = nearest_object_bound,
+						 update_strategy = "random")
+
+		seq_accuracy_list.append(np.mean(seq_accuracies))
+		seq_accuracy_list_se.append(np.std(seq_accuracies, ddof=1)/np.sqrt(num_simulations))
+
+		parallel_accuracy_list.append(np.mean(parallel_accuracies))
+		parallel_accuracy_list_se.append(np.std(parallel_accuracies, ddof=1)/np.sqrt(num_simulations))
+
+		num_time_steps_list.append(num_time_steps)
+
+	num_time_steps_list     = np.asarray(num_time_steps_list)
+	seq_accuracy_list   = 100*np.asarray(seq_accuracy_list)
+	seq_accuracy_list_se = 100*np.asarray(seq_accuracy_list_se)
+	parallel_accuracy_list = 100*np.asarray(parallel_accuracy_list)
+	parallel_accuracy_list_se = 100*np.asarray(parallel_accuracy_list_se)
+
+	filename = get_filename(
+		"accuracy-time-both",
+		sigma = sigma,
+		per_target_attention = per_target_attention,
+		nearest_object_bound = nearest_object_bound,
+	)
+	print(filename)
+	plt.clf()
+	plt.errorbar(num_time_steps_list, seq_accuracy_list, seq_accuracy_list_se,
+				 label="Sequential Strategy")
+	plt.errorbar(num_time_steps_list, parallel_accuracy_list, parallel_accuracy_list_se,
+				 label="Parallel Strategy")
+	plt.title("Accuracy vs Time of tracking\n({0} objects, {1} targets, sigma={2})"
+			  .format(num_objects, num_targets, sigma))
+	plt.xlabel("Number of time steps")
+	plt.ylabel("Accuracy")
+	plt.ylim(0,100)
+	plt.legend()
+	plt.show()
+	write_plot_file(
+		filename = filename,
+		title = "Accuracy vs Time of tracking\n({0} objects, {1} targets, sigma={2})"
+			.format(num_objects, num_targets, sigma),
+		xlabel = "Number of time steps",
+		ylabel = "Accuracy",
+		ylim = [0,100],
+		plot_type = "errorbar",
+		data = {
+			"Sequential Strategy": [
+				num_time_steps_list,
+				seq_accuracy_list,
+				seq_accuracy_list_se,
+			],
+			"Parallel Strategy": [
+				num_time_steps_list,
+				parallel_accuracy_list,
+				parallel_accuracy_list_se,
+			],
+		}
+	)
+
+
+def plot_both_sigma_wrt_targets(
+		base_grid_side,
+		num_simulations,
+		num_time_steps,
+		num_objects,
+		max_num_targets,
+		k, lm, max_sigma=None, sigma_list=None,
+		accuracy_threshold = 80,
+		per_target_attention=None,
+		nearest_object_bound=None
+):
+	grid_side = base_grid_side
+	min_sigma = 0.1
+	int_sigma = ((max_sigma - min_sigma)/10 if max_sigma is not None else None)
+	sigma_list = (np.arange(max_sigma,min_sigma,-int_sigma) if sigma_list is None else sigma_list)
+	seq_sigma_threshold_list     = []
+	parallel_sigma_threshold_list = []
+	num_targets_list = np.arange(1, max_num_targets+1)
+	if type(nearest_object_bound) == list: nob_list = nearest_object_bound
+	else: nob_list = [nearest_object_bound] * max_num_targets
+	print("num_targets sigma seq_accuracy parallel_accuracy")
+	for i in range(max_num_targets):
+		num_targets = num_targets_list[i]
+		nearest_object_bound = nob_list[i]
+		for sigma in sigma_list:
+			_, seq_accuracies = \
+				simulate_mot(grid_side, num_simulations, num_time_steps, num_objects,
+							 num_targets, k, lm, sigma,
+							 per_target_attention = per_target_attention,
+							 nearest_object_bound = nearest_object_bound,
+							 update_strategy = "lowest")
+			_, parallel_accuracies = \
+				simulate_mot(grid_side, num_simulations, num_time_steps, num_objects,
+							 num_targets, k, lm, sigma,
+							 per_target_attention = per_target_attention,
+							 nearest_object_bound = nearest_object_bound,
+							 update_strategy = "random")
+
+			seq_accuracy     = np.mean(seq_accuracies)*100
+			parallel_accuracy = np.mean(parallel_accuracies)*100
+
+			print(num_targets, sigma, seq_accuracy, parallel_accuracy)
+
+			if len(seq_sigma_threshold_list)-1 < i and \
+			   ((seq_accuracy >= accuracy_threshold) or (sigma == sigma_list[-1])):
+				sigma_threshold = sigma
+				seq_sigma_threshold_list.append(sigma_threshold)
+			if len(parallel_sigma_threshold_list)-1 < i and \
+			   ((parallel_accuracy >= accuracy_threshold) or (sigma == sigma_list[-1])):
+				sigma_threshold = sigma
+				parallel_sigma_threshold_list.append(sigma_threshold)
+			if len(seq_sigma_threshold_list) == i+1\
+			   and len(parallel_sigma_threshold_list) == i+1:
+				break
+
+	plt.plot(np.arange(1,max_num_targets+1), seq_sigma_threshold_list, label="Sequential Strategy")
+	plt.plot(np.arange(1,max_num_targets+1), parallel_sigma_threshold_list, label="Parallel Strategy")
+	plt.title("Velocity (sigma) Threshold vs Number of Targets\n({0} Simulations, {1} Time Steps)"\
+			  .format(num_simulations, num_time_steps))
+	plt.xlabel("Number of targets ({0} objects)".format(num_objects),)
+	plt.ylabel("Sigma threshold ({0}% accuracy)".format(accuracy_threshold),)
+	plt.ylim(0, max(sigma_list))
+	plt.legend()
+	plt.show()
+
+	filename = get_filename(
+		"sigma-targets-both",
+		accuracy = accuracy_threshold,
+		time = num_time_steps,
+		per_target_attention = per_target_attention,
+		nearest_object_bound = nearest_object_bound,
+	)
+	write_plot_file(
+		filename = filename,
+		title = "Velocity (sigma) Threshold vs Number of Targets\n({0} Simulations, {1} Time Steps)"\
+			.format(
+				num_simulations,
+				num_time_steps
+			),
+		ylim = [0, max(sigma_list)],
+		plot_type = "plot",
+		xlabel = "Number of targets ({0} objects)".format(num_objects),
+		ylabel = "Sigma threshold ({0}% accuracy)".format(accuracy_threshold),
+		data = {
+			"Sequential Strategy": [np.arange(1,max_num_targets+1), seq_sigma_threshold_list],
+			"Parallel Strategy": [np.arange(1,max_num_targets+1), parallel_sigma_threshold_list],
+		}
+	)
+
+
+def plot_both_acc_wrt_sigma(
+		grid_side, num_simulations, num_time_steps, num_objects, num_targets,
+		k, lm, max_sigma=None, sigma_list=None,
+		per_target_attention=None, last_step_uses_nearest_object=True,
+		nearest_object_bound=None
+):
+	seq_accuracy_list      = []
+	seq_accuracy_list_se   = []
+	parallel_accuracy_list  = []
+	parallel_accuracy_list_se = []
+	chance_accuracy_list  = []
+	chance_accuracy_list_se = []
+	min_sigma = 0.1
+	int_sigma = ((max_sigma - min_sigma)/10 if max_sigma is not None else None)
+	sigma_list = (np.arange(max_sigma,min_sigma,-int_sigma) if sigma_list is None else sigma_list)
+	for sigma in sigma_list:
+		_, seq_accuracies = \
+			simulate_mot(grid_side, num_simulations, num_time_steps, num_objects, num_targets,
+						 k = k, lm = lm, sigma = sigma,
+						 per_target_attention = per_target_attention,
+						 nearest_object_bound = nearest_object_bound,
+						 update_strategy = "lowest")
+		_, parallel_accuracies = \
+			simulate_mot(grid_side, num_simulations, num_time_steps, num_objects, num_targets,
+						 k = k, lm = lm, sigma = sigma,
+						 per_target_attention = per_target_attention,
+						 nearest_object_bound = nearest_object_bound,
+						 update_strategy = "random")
+		_, chance_accuracies = \
+			simulate_mot(grid_side, num_simulations, num_time_steps, num_objects, num_targets,
+						 k = k, lm = lm, sigma = sigma,
+						 per_target_attention = per_target_attention,
+						 nearest_object_bound = 0,
+						 update_strategy = "random")
+
+		seq_accuracy_list.append(np.mean(seq_accuracies))
+		seq_accuracy_list_se.append(np.std(seq_accuracies, ddof=1)/np.sqrt(num_simulations))
+
+		parallel_accuracy_list.append(np.mean(parallel_accuracies))
+		parallel_accuracy_list_se.append(np.std(parallel_accuracies, ddof=1)/np.sqrt(num_simulations))
+
+		chance_accuracy_list.append(np.mean(chance_accuracies))
+		chance_accuracy_list_se.append(np.std(chance_accuracies, ddof=1)/np.sqrt(num_simulations))
+
+	seq_accuracy_list         = 100*np.asarray(seq_accuracy_list)
+	seq_accuracy_list_se      = 100*np.asarray(seq_accuracy_list_se)
+	parallel_accuracy_list    = 100*np.asarray(parallel_accuracy_list)
+	parallel_accuracy_list_se = 100*np.asarray(parallel_accuracy_list_se)
+	chance_accuracy_list      = 100*np.asarray(chance_accuracy_list)
+	chance_accuracy_list_se   = 100*np.asarray(chance_accuracy_list_se)
+
+
+	filename = get_filename(
+		"accuracy-sigma-both",
+		sigma = sigma,
+		per_target_attention = per_target_attention,
+		nearest_object_bound = nearest_object_bound,
+	)
+	print(filename)
+	plt.clf()
+	plt.errorbar(sigma_list, seq_accuracy_list, seq_accuracy_list_se,
+				 label="Sequential Strategy")
+	plt.errorbar(sigma_list, parallel_accuracy_list, parallel_accuracy_list_se,
+				 label="Parallel Strategy")
+	plt.errorbar(sigma_list, chance_accuracy_list, chance_accuracy_list_se,
+				 label="Chance Performance")
+	plt.title("Accuracy vs Object Speeds\n({0} objects, {1} targets)"
+			  .format(num_objects, num_targets))
+	plt.xlabel("Object Speed (sigma)")
+	plt.ylabel("Accuracy")
+	plt.ylim(0,100)
+	plt.legend()
+	plt.show()
+	write_plot_file(
+		filename = filename,
+		title = "Accuracy vs Object Speeds\n({0} objects, {1} targets)"\
+				.format(num_objects, num_targets),
+		xlabel = "Object Speed (sigma)",
+		ylabel = "Accuracy",
+		ylim = [0,100],
+		plot_type = "errorbar",
+		data = {
+			"Sequential Strategy": [
+				sigma_list,
+				seq_accuracy_list,
+				seq_accuracy_list_se,
+			],
+			"Parallel Strategy": [
+				sigma_list,
+				parallel_accuracy_list,
+				parallel_accuracy_list_se,
+			],
+			"Chance Performance": [
+				sigma_list,
+				chance_accuracy_list,
+				chance_accuracy_list_se,
+			],
+		}
+	)
 
 
 def plot_mot_mit_wrt_targets(
@@ -492,8 +1198,214 @@ def plot_mot_id_wrt_targets(
 	)
 
 
+def plot_id_wrt_time(
+		grid_side, num_simulations, max_time_steps, num_objects, num_targets,
+		k, lm, sigma,
+		per_target_attention=None,
+		nearest_object_bound=None,
+		update_strategy="random"
+):
+	"""
+	Plots percentage of targets that were tracked wrt time
+	"""
+	our_mot_accuracy_list    = []
+	our_mot_accuracy_list_se = []
 
-def plot_mot_id_wrt_time(
+	our_id_accuracy_list    = []
+	our_id_accuracy_list_se = []
+
+	num_time_steps_list = []
+
+	for num_time_steps in range(10, max_time_steps, (max_time_steps-10)//5):
+		_, our_mot_accuracies, _, our_id_accuracies = \
+			simulate_mot(grid_side, num_simulations, num_time_steps, num_objects, num_targets,
+						 k = k, lm = lm, sigma = sigma,
+						 per_target_attention = per_target_attention,
+						 nearest_object_bound = nearest_object_bound,
+						 update_strategy = update_strategy,
+						 return_id_accuracy = True)
+
+		our_mot_accuracy_list.append(np.mean(our_mot_accuracies))
+		our_mot_accuracy_list_se.append(
+			np.std(our_mot_accuracies, ddof=1)/np.sqrt(num_simulations)
+		)
+
+		our_id_accuracy_list.append(np.mean(our_id_accuracies))
+		our_id_accuracy_list_se.append(
+			np.std(our_id_accuracies, ddof=1)/np.sqrt(num_simulations)
+		)
+
+		num_time_steps_list.append(num_time_steps)
+
+	num_time_steps_list                 = np.asarray(num_time_steps_list)
+	our_mot_accuracy_list           = 100*np.asarray(our_mot_accuracy_list)
+	our_mot_accuracy_list_se        = 100*np.asarray(our_mot_accuracy_list_se)
+	our_id_accuracy_list            = 100*np.asarray(our_id_accuracy_list)
+	our_id_accuracy_list_se         = 100*np.asarray(our_id_accuracy_list_se)
+
+	filename = get_filename(
+		"accuracy-time-id",
+		per_target_attention = per_target_attention,
+		nearest_object_bound = nearest_object_bound,
+		update_strategy = update_strategy
+	)
+	print(filename)
+
+	plt.clf()
+	markercycle = cycler(marker=['o', '^', 's', '*', 'P', 'd'])
+	colorcycle = cycler(color=plt.rcParams['axes.prop_cycle'].by_key()['color'][:6])
+	plt.gca().set_prop_cycle(colorcycle + markercycle)
+	mpl.rcParams["lines.markersize"] = 10
+	plt.errorbar(num_time_steps_list, our_mot_accuracy_list, our_mot_accuracy_list_se,
+				 label="Our Tracking Accuracy")
+	plt.errorbar(num_time_steps_list, our_id_accuracy_list, our_id_accuracy_list_se,
+				 label="Our ID Accuracy")
+	plt.xlabel("Number of Time Steps (Trial Duration)")
+	plt.ylabel("Accuracy")
+	plt.ylim(0,100)
+	plt.legend()
+	plt.show()
+
+	write_plot_file(
+		filename = filename,
+		title = "Accuracy vs Trial Duration",
+		xlabel = "Number of Time Steps (Trial Duration)",
+		ylabel = "Accuracy",
+		ylim = [0,100],
+		plot_type = "errorbar",
+		data = {
+			"Our Tracking Accuracy": [
+				num_time_steps_list, our_mot_accuracy_list, our_mot_accuracy_list_se
+			],
+			"Our ID Accuracy": [
+				num_time_steps_list, our_id_accuracy_list, our_id_accuracy_list_se
+			]
+		}
+	)
+
+
+def plot_momit_id_wrt_time(
+		grid_side, num_simulations, max_time_steps, num_objects, num_targets,
+		k, lm, sigma,
+		per_target_attention=None,
+		nearest_object_bound=None,
+		update_strategy="random"
+):
+	"""
+	Plots percentage of targets that were tracked wrt time
+	"""
+	momit_accuracy_list      = []
+	momit_accuracy_list_se   = []
+
+	momit_static_id_accuracy_list      = []
+	momit_static_id_accuracy_list_se   = []
+
+	momit_nonstatic_id_accuracy_list    = []
+	momit_nonstatic_id_accuracy_list_se = []
+
+	num_time_steps_list = []
+
+	for num_time_steps in range(10, max_time_steps, (max_time_steps-10)//5):
+		momit_accuracies, _, momit_static_id_accuracies, _ = \
+			simulate_mot(grid_side, num_simulations, num_time_steps, num_objects, num_targets,
+						 k = k, lm = lm, sigma = sigma,
+						 per_target_attention = per_target_attention,
+						 nearest_object_bound = nearest_object_bound,
+						 update_strategy = update_strategy,
+						 return_id_accuracy = True,
+						 use_static_indices = True)
+
+		_, _ , momit_nonstatic_id_accuracies, _ = \
+			simulate_mot(grid_side, num_simulations, num_time_steps, num_objects, num_targets,
+						 k = k, lm = lm, sigma = sigma,
+						 per_target_attention = per_target_attention,
+						 nearest_object_bound = nearest_object_bound,
+						 update_strategy = update_strategy,
+						 return_id_accuracy = True,
+						 use_static_indices = False)
+
+
+		momit_accuracy_list.append(np.mean(momit_accuracies))
+		momit_accuracy_list_se.append(np.std(momit_accuracies, ddof=1)/np.sqrt(num_simulations))
+
+		momit_static_id_accuracy_list.append(np.mean(momit_static_id_accuracies))
+		momit_static_id_accuracy_list_se.append(
+			np.std(momit_static_id_accuracies, ddof=1)/np.sqrt(num_simulations)
+		)
+
+		momit_nonstatic_id_accuracy_list.append(np.mean(momit_nonstatic_id_accuracies))
+		momit_nonstatic_id_accuracy_list_se.append(
+			np.std(momit_nonstatic_id_accuracies, ddof=1)/np.sqrt(num_simulations)
+		)
+
+		num_time_steps_list.append(num_time_steps)
+
+	num_time_steps_list                 = np.asarray(num_time_steps_list)
+	momit_accuracy_list                 = 100*np.asarray(momit_accuracy_list)
+	momit_accuracy_list_se              = 100*np.asarray(momit_accuracy_list_se)
+	momit_static_id_accuracy_list       = 100*np.asarray(momit_static_id_accuracy_list)
+	momit_static_id_accuracy_list_se    = 100*np.asarray(momit_static_id_accuracy_list_se)
+	momit_nonstatic_id_accuracy_list    = 100*np.asarray(momit_nonstatic_id_accuracy_list)
+	momit_nonstatic_id_accuracy_list_se = 100*np.asarray(momit_nonstatic_id_accuracy_list_se)
+	# For chance performance: see
+	# https://math.stackexchange.com/questions/3231096/what-is-the-average-number-of-matches-when-randomly-picking-letters
+	chance_id_accuracy_list             = 100*np.asarray([1/num_targets]*len(num_time_steps_list))
+	chance_id_accuracy_list_se          = 100*np.asarray([0]*len(num_time_steps_list))
+
+	filename = get_filename(
+		"accuracy-time-momit-id",
+		per_target_attention = per_target_attention,
+		nearest_object_bound = nearest_object_bound,
+		update_strategy = update_strategy
+	)
+	print(filename)
+
+	plt.clf()
+	markercycle = cycler(marker=['o', '^', 's', '*', 'P', 'd'])
+	colorcycle = cycler(color=plt.rcParams['axes.prop_cycle'].by_key()['color'][:6])
+	plt.gca().set_prop_cycle(colorcycle + markercycle)
+	mpl.rcParams["lines.markersize"] = 10
+	plt.errorbar(num_time_steps_list, momit_accuracy_list, momit_accuracy_list_se,
+				 label="MOMIT Tracking Accuracy")
+	plt.errorbar(num_time_steps_list, momit_static_id_accuracy_list, momit_static_id_accuracy_list_se,
+				 label="MOMIT ID Accuracy (static indices)")
+	plt.errorbar(num_time_steps_list, momit_nonstatic_id_accuracy_list,
+				 momit_nonstatic_id_accuracy_list_se,
+				 label="MOMIT ID Accuracy (nonstatic indices)")
+	plt.errorbar(num_time_steps_list, chance_id_accuracy_list, chance_id_accuracy_list_se,
+				 label="Chance ID Accuracy (with nob)")
+	plt.xlabel("Number of Time Steps (Trial Duration)")
+	plt.ylabel("Accuracy")
+	plt.ylim(0,100)
+	plt.legend()
+	plt.show()
+
+	write_plot_file(
+		filename = filename,
+		title = "Accuracy vs Trial Duration",
+		xlabel = "Number of Time Steps (Trial Duration)",
+		ylabel = "Accuracy",
+		ylim = [0,100],
+		plot_type = "errorbar",
+		data = {
+			"MOMIT Tracking Accuracy": [
+				num_time_steps_list, momit_accuracy_list, momit_accuracy_list_se
+			],
+			"MOMIT ID Accuracy (static indices)": [
+				num_time_steps_list, momit_static_id_accuracy_list, momit_static_id_accuracy_list_se
+			],
+			"MOMIT ID Accuracy (nonstatic indices)": [
+				num_time_steps_list, momit_nonstatic_id_accuracy_list,
+				momit_nonstatic_id_accuracy_list_se
+			],
+			"Chance ID Accuracy": [
+				num_time_steps_list, chance_id_accuracy_list, chance_id_accuracy_list_se
+			]
+		}
+	)
+
+
+def plot_perfect_mot_id_wrt_time(
 		grid_side, num_simulations, max_time_steps, num_objects, num_targets,
 		k, lm, sigma,
 		per_target_attention=None,
@@ -527,7 +1439,8 @@ def plot_mot_id_wrt_time(
 						 nearest_object_bound = nearest_object_bound,
 						 update_strategy = update_strategy,
 						 return_id_accuracy = True,
-						 use_static_indices = True)
+						 use_static_indices = True,
+						 id_only_for_perfect_tracking = True)
 
 		_, _ , momit_nonstatic_id_accuracies, _ = \
 			simulate_mot(grid_side, num_simulations, num_time_steps, num_objects, num_targets,
@@ -536,7 +1449,8 @@ def plot_mot_id_wrt_time(
 						 nearest_object_bound = nearest_object_bound,
 						 update_strategy = update_strategy,
 						 return_id_accuracy = True,
-						 use_static_indices = False)
+						 use_static_indices = False,
+						 id_only_for_perfect_tracking = True)
 
 
 		momit_mot_accuracy_list.append(np.mean(momit_mot_accuracies))
@@ -577,7 +1491,7 @@ def plot_mot_id_wrt_time(
 	our_nob_id_accuracy_list_se         = 100*np.asarray(our_nob_id_accuracy_list_se)
 
 	filename = get_filename(
-		"accuracy-time-mot-id",
+		"accuracy-time-perfect-mot-id",
 		per_target_attention = per_target_attention,
 		nearest_object_bound = nearest_object_bound,
 		update_strategy = update_strategy
@@ -634,8 +1548,168 @@ def plot_mot_id_wrt_time(
 	)
 
 
+def plot_id_swaps(
+		grid_side, num_simulations, num_time_steps, num_objects, num_targets,
+		k, lm, sigma,
+		per_target_attention=None,
+		nearest_object_bound=None,
+		update_strategy="random"
+):
+	"""
+	Plots percentage of targets that were tracked wrt time
+	"""
+
+	_, _, tt_swaps, tn_swaps, both_swaps, none_swaps = \
+		simulate_mot(grid_side, num_simulations, num_time_steps, num_objects, num_targets,
+					 k = k, lm = lm, sigma = sigma,
+					 per_target_attention = per_target_attention,
+					 nearest_object_bound = nearest_object_bound,
+					 update_strategy = update_strategy,
+					 return_swap_count=True)
+
+	tt_swaps_mean = np.mean(tt_swaps)
+	tt_swaps_se   = np.std(tt_swaps, ddof=1)/np.sqrt(num_simulations)
+
+	tn_swaps_mean = np.mean(tn_swaps)
+	tn_swaps_se   = np.std(tn_swaps, ddof=1)/np.sqrt(num_simulations)
+
+	both_swaps_mean = np.mean(both_swaps)
+	both_swaps_se   = np.std(both_swaps, ddof=1)/np.sqrt(num_simulations)
+
+	none_swaps_mean = np.mean(none_swaps)
+	none_swaps_se   = np.std(none_swaps, ddof=1)/np.sqrt(num_simulations)
+
+	tt_swaps_mean, tn_swaps_mean, both_swaps_mean, none_swaps_mean = \
+		100*tt_swaps_mean, 100*tn_swaps_mean,\
+		100*both_swaps_mean, 100*none_swaps_mean
+
+	tt_swaps_se, tn_swaps_se, both_swaps_se, none_swaps_se = \
+		100*tt_swaps_se, 100*tn_swaps_se,\
+		100*both_swaps_se, 100*none_swaps_se
+
+	filename = get_filename(
+		"id-swap",
+		per_target_attention = per_target_attention,
+		nearest_object_bound = nearest_object_bound,
+		update_strategy = update_strategy,
+		time = num_time_steps
+	)
+	print(filename)
+
+	plt.clf()
+	markercycle = cycler(marker=['o', '^', 's', '*', 'P', 'd'])
+	colorcycle = cycler(color=plt.rcParams['axes.prop_cycle'].by_key()['color'][:6])
+	plt.gca().set_prop_cycle(colorcycle + markercycle)
+	mpl.rcParams["lines.markersize"] = 10
+	plt.bar(
+		x = [1.5,2.5,3.5,4.5],
+		height = [tt_swaps_mean, tn_swaps_mean, both_swaps_mean, none_swaps_mean],
+		tick_label = ["TT Swaps", "TN Swaps", "Both", "None"],
+		yerr = [tt_swaps_se, tn_swaps_se, both_swaps_se, none_swaps_se],
+		width = 0.5
+	)
+	plt.xlabel("Type of Swap")
+	plt.ylabel("Percent of trials with one or more swaps")
+	plt.ylim(0,100)
+	plt.legend()
+	plt.show()
+
+	write_plot_file(
+		filename = filename,
+		title = "Proportion of Trials vs Type of Swap",
+		xlabel = "Type of Swap",
+		ylabel = "Percent of trials with one or more swaps",
+		ylim = [0,100],
+		plot_type = "bar",
+		data = {
+			"Our Model": {
+				"x": [1.5,2.5,3.5,4.5],
+				"height": [tt_swaps_mean, tn_swaps_mean, both_swaps_mean, none_swaps_mean],
+				"tick_label": ["TT Swaps", "TN Swaps", "Both", "None"],
+				"yerr": [tt_swaps_se, tn_swaps_se, both_swaps_se, none_swaps_se],
+				"width": 0.5
+			}
+		}
+	)
+
 
 def plot_sigma_wrt_targets(
+		base_grid_side,
+		num_simulations,
+		num_time_steps,
+		num_objects,
+		max_num_targets,
+		k, lm, max_sigma=None, sigma_list=None,
+		accuracy_threshold = 80,
+		per_target_attention=None,
+		nearest_object_bound=None,
+		update_strategy = "random"
+):
+	grid_side = base_grid_side
+	min_sigma = 0.1
+	int_sigma = ((max_sigma - min_sigma)/10 if max_sigma is not None else None)
+	sigma_list = (np.arange(max_sigma,min_sigma,-int_sigma) if sigma_list is None else sigma_list)
+	our_sigma_threshold_list     = []
+	num_targets_list = np.arange(1, max_num_targets+1)
+	if type(nearest_object_bound) == list: nob_list = nearest_object_bound
+	else: nob_list = [nearest_object_bound] * max_num_targets
+	print("num_targets sigma momit_accuracy our_accuracy")
+	for i in range(max_num_targets):
+		num_targets = num_targets_list[i]
+		nearest_object_bound = nob_list[i]
+		for sigma in sigma_list:
+			_, our_accuracies = \
+				simulate_mot(grid_side, num_simulations, num_time_steps, num_objects,
+							 num_targets, k, lm, sigma,
+							 per_target_attention = per_target_attention,
+							 nearest_object_bound = nearest_object_bound,
+							 update_strategy=update_strategy)
+
+			our_accuracy     = np.mean(our_accuracies)*100
+
+			print(num_targets, sigma, our_accuracy)
+
+			if len(our_sigma_threshold_list)-1 < i and \
+			   ((our_accuracy >= accuracy_threshold) or (sigma == sigma_list[-1])):
+				sigma_threshold = sigma
+				our_sigma_threshold_list.append(sigma_threshold)
+			if len(our_sigma_threshold_list) == i+1: break
+
+	plt.plot(np.arange(1,max_num_targets+1), our_sigma_threshold_list, label="Our Model (w/o nob)")
+	plt.title("Velocity (sigma) Threshold vs Number of Targets\n({0} Simulations, {1} Time Steps)"\
+			  .format(num_simulations, num_time_steps))
+	plt.xlabel("Number of targets ({0} objects)".format(num_objects),)
+	plt.ylabel("Sigma threshold ({0}% accuracy)".format(accuracy_threshold),)
+	plt.ylim(0, max(sigma_list))
+	plt.legend()
+	plt.show()
+
+	filename = get_filename(
+		"sigma-targets",
+		accuracy = accuracy_threshold,
+		time = num_time_steps,
+		per_target_attention = per_target_attention,
+		nearest_object_bound = nearest_object_bound,
+		update_strategy = update_strategy
+	)
+	write_plot_file(
+		filename = filename,
+		title = "Velocity (sigma) Threshold vs Number of Targets\n({0} Simulations, {1} Time Steps)"\
+			.format(
+				num_simulations,
+				num_time_steps
+			),
+		ylim = [0, max(sigma_list)],
+		plot_type = "plot",
+		xlabel = "Number of targets ({0} objects)".format(num_objects),
+		ylabel = "Sigma threshold ({0}% accuracy)".format(accuracy_threshold),
+		data = {
+			"Our Model": [np.arange(1,max_num_targets+1), our_sigma_threshold_list]
+		}
+	)
+
+
+def plot_momit_sigma_wrt_targets(
 		base_grid_side,
 		num_simulations,
 		num_time_steps,
@@ -996,18 +2070,18 @@ if __name__ == "__main__":
 	# # SECTION 1: Accuracy vs Number of Targets =================================
 	# plot_acc_wrt_targets(
 	# 	grid_side = 720,
-	# 	num_simulations = 50,
+	# 	num_simulations = 100,
 	# 	num_time_steps = 50,
 	# 	num_objects = 14,
 	# 	max_num_targets = 8,
 	# 	k = 0.0005,
 	# 	lm = 0.9,
-	# 	sigma = 4,
+	# 	sigma = 2,
 	# 	update_strategy="lowest",
 	# 	nearest_object_bound=30,
 	# )
 
-	# # # SECTION 2: Accuracy vs Time of trial =====================================
+	# SECTION 2: Accuracy vs Time of trial =====================================
 	# plot_acc_wrt_time(
 	# 	grid_side = 720,
 	# 	num_simulations = 100,
@@ -1030,45 +2104,73 @@ if __name__ == "__main__":
 	# 	max_num_targets = 8,
 	# 	k = 0.0005,
 	# 	lm = 0.9,
-	# 	sigma_list = [5, 4.5, 4, 3.6, 3.3, 3, 2.7, 2.4, 2.1, 1.8, 1.5,
-	# 				  1.2, 1.0, 0.8, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1],
+	# 	# sigma_list = [5, 4.5, 4, 3.6, 3.3, 3, 2.7, 2.4, 2.1, 1.8, 1.5,
+	# 	# 			  1.2, 1.0, 0.8, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1],
+	# 	sigma_list = [5, 4.5, 4, 3.6, 3.3, 3, 2.8, 2.6, 2.4, 2.2, 2.0, 1.8, 1.6,
+	# 				  1.4, 1.3, 1.2, 1.1, 1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1],
 	# 	accuracy_threshold = 80,
 	# 	update_strategy="lowest",
 	# 	nearest_object_bound=30,
 	# )
 
-	# SECTION 4: MOT vs MIT Accuracy ===========================================
-	# plot_mot_mit_wrt_targets(
+	# SECTION 4: Accuracy wrt Velocity / Sigma =================================
+	# plot_acc_wrt_sigma(
 	# 	grid_side = 720,
-	# 	num_simulations = 50,
+	# 	num_simulations = 100,
 	# 	num_time_steps = 50,
 	# 	num_objects = 14,
-	# 	max_num_targets = 8,
+	# 	num_targets = 4,
 	# 	k = 0.0005,
 	# 	lm = 0.9,
-	# 	sigma = 4,
+	# 	max_sigma = 4,
+	# 	update_strategy="lowest",
+	# 	nearest_object_bound=30
+	# )
+
+	# SECTION 5: Tracking vs ID Performance ====================================
+	plot_id_wrt_time(
+		grid_side = 720,
+		num_simulations = 100,
+		max_time_steps = 400,
+		num_objects = 8,
+		num_targets = 4,
+		k = 0.0005,
+		lm = 0.9,
+		sigma = 1.5,
+		update_strategy="lowest",
+		nearest_object_bound=30,
+	)
+
+
+	# SECTION 6: Swap Count ====================================================
+	# plot_id_swaps(
+	# 	grid_side = 720,
+	# 	num_simulations = 100,
+	# 	num_time_steps = 240,
+	# 	num_objects = 8,
+	# 	num_targets = 4,
+	# 	k = 0.0005,
+	# 	lm = 0.9,
+	# 	sigma = 1.5,
 	# 	update_strategy="lowest",
 	# 	nearest_object_bound=30,
 	# )
+	plot_id_swaps(
+		grid_side = 720,
+		num_simulations = 100,
+		num_time_steps = 400,
+		num_objects = 8,
+		num_targets = 4,
+		k = 0.0005,
+		lm = 0.9,
+		sigma = 1.5,
+		update_strategy="lowest",
+		nearest_object_bound=30,
+	)
 
-	# SECTION 5: Tracking vs ID Accuracy =======================================
-	# print(
-	# 	simulate_mot(
-	# 		grid_side = 720,
-	# 		num_simulations = 2,
-	# 		num_time_steps = 10,
-	# 		num_objects = 14,
-	# 		num_targets = 4,
-	# 		k = 0.0005,
-	# 		lm = 0.9,
-	# 		sigma = 2,
-	# 		update_strategy = "lowest",
-	# 		return_id_accuracy = True,
-	# 		use_static_indices = False
-	# 	)
-	# )
 
-	# plot_mot_id_wrt_targets(
+	# SECTION 7: Basic graphs but with MOMIT ===================================
+	# plot_momit_acc_wrt_targets(
 	# 	grid_side = 720,
 	# 	num_simulations = 50,
 	# 	num_time_steps = 50,
@@ -1080,16 +2182,107 @@ if __name__ == "__main__":
 	# 	update_strategy="lowest",
 	# 	nearest_object_bound=30,
 	# )
+	# plot_momit_acc_wrt_time(
+	# 	grid_side = 720,
+	# 	num_simulations = 100,
+	# 	max_time_steps = 50,
+	# 	num_objects = 14,
+	# 	num_targets = 4,
+	# 	k = 0.0005,
+	# 	lm = 0.9,
+	# 	sigma = 2,
+	# 	update_strategy="lowest",
+	# 	nearest_object_bound=30
+	# )
+	# plot_momit_sigma_wrt_targets(
+	# 	base_grid_side = 720,
+	# 	num_simulations = 50,
+	# 	num_time_steps = 50,
+	# 	num_objects = 14,
+	# 	max_num_targets = 8,
+	# 	k = 0.0005,
+	# 	lm = 0.9,
+	# 	# sigma_list = [5, 4.5, 4, 3.6, 3.3, 3, 2.7, 2.4, 2.1, 1.8, 1.5,
+	# 	# 			  1.2, 1.0, 0.8, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1],
+	# 	sigma_list = [5, 4.5, 4, 3.6, 3.3, 3, 2.8, 2.6, 2.4, 2.2, 2.0, 1.8, 1.6,
+	# 				  1.4, 1.3, 1.2, 1.1, 1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1],
+	# 	accuracy_threshold = 80,
+	# 	update_strategy="lowest",
+	# 	nearest_object_bound=30,
+	# )
+	# plot_momit_acc_wrt_sigma(
+	# 	grid_side = 720,
+	# 	num_simulations = 100,
+	# 	num_time_steps = 50,
+	# 	num_objects = 14,
+	# 	num_targets = 4,
+	# 	k = 0.0005,
+	# 	lm = 0.9,
+	# 	max_sigma = 4,
+	# 	update_strategy="lowest",
+	# 	nearest_object_bound=30
+	# )
 
-	plot_mot_id_wrt_time(
-		grid_side = 720,
-		num_simulations = 50,
-		max_time_steps = 100,
-		num_objects = 14,
-		num_targets = 4,
-		k = 0.0005,
-		lm = 0.9,
-		sigma = 2,
-		update_strategy="lowest",
-		nearest_object_bound=30,
-	)
+	# SECTION 8: MOMIT ID Performance ==========================================
+	# plot_momit_id_wrt_time(
+	# 	grid_side = 720,
+	# 	num_simulations = 50,
+	# 	max_time_steps = 100,
+	# 	num_objects = 14,
+	# 	num_targets = 4,
+	# 	k = 0.0005,
+	# 	lm = 0.9,
+	# 	sigma = 2,
+	# 	update_strategy="lowest",
+	# 	nearest_object_bound=30,
+	# )
+
+	# SECTION 9: Serial vs Parallel Comparison =================================
+	# plot_both_acc_wrt_targets(
+	# 	grid_side = 720,
+	# 	num_simulations = 50,
+	# 	num_time_steps = 50,
+	# 	num_objects = 14,
+	# 	max_num_targets = 8,
+	# 	k = 0.0005,
+	# 	lm = 0.9,
+	# 	sigma = 2,
+	# 	nearest_object_bound=30
+	# )
+	# plot_both_acc_wrt_time(
+	# 	grid_side = 720,
+	# 	num_simulations = 100,
+	# 	max_time_steps = 50,
+	# 	num_objects = 14,
+	# 	num_targets = 4,
+	# 	k = 0.0005,
+	# 	lm = 0.9,
+	# 	sigma = 2,
+	# 	nearest_object_bound=30
+	# )
+	# plot_both_sigma_wrt_targets(
+	# 	base_grid_side = 720,
+	# 	num_simulations = 50,
+	# 	num_time_steps = 50,
+	# 	num_objects = 14,
+	# 	max_num_targets = 8,
+	# 	k = 0.0005,
+	# 	lm = 0.9,
+	# 	# sigma_list = [5, 4.5, 4, 3.6, 3.3, 3, 2.7, 2.4, 2.1, 1.8, 1.5,
+	# 	# 			  1.2, 1.0, 0.8, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1],
+	# 	sigma_list = [5, 4.5, 4, 3.6, 3.3, 3, 2.8, 2.6, 2.4, 2.2, 2.0, 1.8, 1.6,
+	# 				  1.4, 1.3, 1.2, 1.1, 1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1],
+	# 	accuracy_threshold = 80,
+	# 	nearest_object_bound=30,
+	# )
+	# plot_both_acc_wrt_sigma(
+	# 	grid_side = 720,
+	# 	num_simulations = 100,
+	# 	num_time_steps = 50,
+	# 	num_objects = 14,
+	# 	num_targets = 4,
+	# 	k = 0.0005,
+	# 	lm = 0.9,
+	# 	max_sigma = 4,
+	# 	nearest_object_bound=30
+	# )

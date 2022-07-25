@@ -1,12 +1,14 @@
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import json
 import os
 import sys
+from cycler import cycler
 
 plt.rcParams.update({'font.size': 16})
 
-PLOT_DATA_DIR=("plot-data/" if len(sys.argv)<2 else sys.argv[1])
-PLOT_DIR="plots/"
+PLOT_DATA_DIR=("plot-data-v2/" if len(sys.argv)<2 else sys.argv[1])
+PLOT_DIR="plots-v2/"
 
 if __name__ == "__main__":
 	data_files = os.listdir(PLOT_DATA_DIR)
@@ -16,6 +18,12 @@ if __name__ == "__main__":
 			try:
 				plot_details = json.load(inf)
 				plt.clf()
+				plt.figure(figsize=(6,4))
+				markercycle = cycler(marker=['o', '^', 's', '*', 'P', 'd'])
+				colorcycle = cycler(color=plt.rcParams['axes.prop_cycle'].by_key()['color'][:6])
+				plt.gca().set_prop_cycle(colorcycle + markercycle)
+				mpl.rcParams["lines.markersize"] = 8
+
 				plt.title(plot_details["title"])
 				plt.xlabel(plot_details["xlabel"])
 				plt.ylabel(plot_details["ylabel"])
@@ -31,6 +39,14 @@ if __name__ == "__main__":
 						plt.errorbar(x=d[0], y=d[1], yerr=d[2], label=label)
 					elif plotfun == "scatter":
 						plt.scatter(x=d[0], y=d[1], label=label)
+					elif plotfun == "bar":
+						plt.bar(
+							x=d["x"],
+							height=d["height"],
+							tick_label=d["tick_label"],
+							yerr=d["yerr"],
+							width=d["width"],
+						)
 					else:
 						raise Exception("Don't know how to plot " + plotfun)
 				if len(data.keys()) > 1: plt.legend()

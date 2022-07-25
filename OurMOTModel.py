@@ -8,22 +8,26 @@ class OurMOTModel:
 	def __init__(self, num_targets, per_target_attention=None, nearest_object_bound=None):
 		self.num_targets = num_targets
 		if per_target_attention is None:
-			self.per_target_attention = [1,0.85,0.7,0.6,0.5,0.3,0.1,0.03][num_targets-1]
+			self.update_per_target_attention()
 		self.target_locations = None
 		self.nearest_object_bound = nearest_object_bound
 		self.target_id_sequence = None
 
+	def update_per_target_attention(self):
+		self.per_target_attention = [1,0.85,0.7,0.6,0.5,0.3,0.1,0.03][self.num_targets-1]
+
+
 	@staticmethod
 	def nearest_object_heuristic(object_locations, i, j, bound=None):
-		if (i,j) in object_locations: return (i,j)
+		if (i,j) in object_locations: return (i,j), 0
 		object_locations = sorted(object_locations, key=lambda x: (x[0]-i)**2 + (x[1]-j)**2)
 		# print(i, j, "\n", object_locations)
-		if bound is None: return object_locations[0]
+		if bound is None: return object_locations[0], None
 		else:
 			newi, newj = object_locations[0]
 			dist = np.sqrt((i-newi)**2 + (j-newj)**2)
-			if dist <= bound: return object_locations[0]
-			else: return random.choice(object_locations)
+			if dist <= bound: return object_locations[0], dist
+			else: return random.choice(object_locations), dist
 
 	def process_env(self, env:Environment, observe_targets=False, strategy="random"):
 		if observe_targets:
@@ -47,20 +51,46 @@ class OurMOTModel:
 					new_target_locations.append(loc)
 				else:
 					i, j = loc
-					newloc = OurMOTModel.nearest_object_heuristic(
-						object_locations, i, j, bound=self.nearest_object_bound
-					)
-					new_target_locations.append(newloc)
+					if len(target_locations)>1:
+						newloc, dist = OurMOTModel.nearest_object_heuristic(
+							object_locations, i, j, bound=self.nearest_object_bound
+						)
+						if self.nearest_object_bound is None or dist<=self.nearest_object_bound:
+							new_target_locations.append(newloc)
+						else:
+							self.num_targets -= 1
+							self.update_per_target_attention()
+					else:
+						newloc, dist = OurMOTModel.nearest_object_heuristic(
+							object_locations, i, j, bound=None
+						)
+						new_target_locations.append(newloc)
 			self.target_locations = new_target_locations
 		elif strategy == "lowest":
 			target_locations = self.target_locations
 			object_locations = env.get_object_locations()
 			loc = self.target_locations[0]
 			i, j = loc
-			newloc = OurMOTModel.nearest_object_heuristic(
-				object_locations, i, j, bound=self.nearest_object_bound
-			)
-			new_target_locations  = target_locations[1:] + [newloc]
+			if len(target_locations)>1:
+				newloc, dist = OurMOTModel.nearest_object_heuristic(
+					object_locations, i, j, bound=self.nearest_object_bound
+				)
+				if self.nearest_object_bound is None or dist<=self.nearest_object_bound:
+					new_target_locations = target_locations[1:] + [newloc]
+				else:
+					new_target_locations = target_locations[1:]
+					# TODO: Remove the appropriate ID in target-ID sequence
+					target_locations = sorted(target_locations)
+					id_pos = target_locations.index(loc)
+					del self.target_id_sequence[id_pos]
+			else:
+				newloc, dist = OurMOTModel.nearest_object_heuristic(
+					object_locations, i, j, bound=None
+				)
+				new_target_locations = [newloc]
+			assert len(new_target_locations) <= len(target_locations),\
+				"Target locations: {0}\nNew target locations: {1}\nDist: {2}".\
+				format(target_locations, new_target_locations, dist)
 			self.target_locations = new_target_locations
 		else:
 			raise Exception("Unknown strategy: " + strategy)

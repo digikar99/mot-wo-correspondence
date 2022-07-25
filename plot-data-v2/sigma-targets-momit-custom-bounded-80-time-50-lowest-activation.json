@@ -1,0 +1,78 @@
+{
+ "title": "Velocity (sigma) Threshold vs Number of Targets\n(50 Simulations, 50 Time Steps)",
+ "xlabel": "Number of targets (14 objects)",
+ "ylabel": "Sigma threshold (80% accuracy)",
+ "plot_type": "plot",
+ "ylim": [
+  0,
+  5
+ ],
+ "data": {
+  "MOMIT": [
+   [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+   ],
+   [
+    5,
+    3.6,
+    2.8,
+    2.6,
+    1.3,
+    0.1,
+    0.1,
+    0.1
+   ]
+  ],
+  "Our Model (w/o nob)": [
+   [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+   ],
+   [
+    5,
+    3.6,
+    2.8,
+    2.6,
+    2.6,
+    2.6,
+    2.0,
+    2.2
+   ]
+  ],
+  "Our Model (with nob)": [
+   [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8
+   ],
+   [
+    4.5,
+    2.8,
+    2.2,
+    1.8,
+    1.6,
+    1.6,
+    1.4,
+    1.4
+   ]
+  ]
+ }
+}

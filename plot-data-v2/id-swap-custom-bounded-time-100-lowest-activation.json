@@ -1,0 +1,39 @@
+{
+ "title": "Proportion of Trials vs Type of Swap",
+ "xlabel": "Type of Swap",
+ "ylabel": "Percent of trials with one or more swaps",
+ "plot_type": "bar",
+ "ylim": [
+  0,
+  100
+ ],
+ "data": {
+  "Our Model": {
+   "x": [
+    1.5,
+    2.5,
+    3.5,
+    4.5
+   ],
+   "height": [
+    32.0,
+    11.0,
+    3.0,
+    6.0
+   ],
+   "tick_label": [
+    "TT Swaps",
+    "TN Swaps",
+    "Both",
+    "None"
+   ],
+   "yerr": [
+    4.688261722621506,
+    3.1446603773522015,
+    1.7144660799776525,
+    2.3868325657594203
+   ],
+   "width": 0.5
+  }
+ }
+}
