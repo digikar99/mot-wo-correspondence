@@ -1284,6 +1284,92 @@ def plot_id_wrt_time(
 	)
 
 
+def plot_id_wrt_targets(
+		grid_side, num_simulations, num_time_steps, num_objects, max_num_targets,
+		k, lm, sigma, per_target_attention=None,
+		nearest_object_bound=None, update_strategy="random"
+):
+	our_accuracy_list       = []
+	our_accuracy_list_se    = []
+	our_id_accuracy_list    = []
+	our_id_accuracy_list_se = []
+	chance_accuracy_list    = []
+	chance_accuracy_list_se = []
+	num_target_list = []
+	for num_targets in range(1, max_num_targets+1):
+		_, our_accuracies, _, our_id_accuracies = \
+			simulate_mot(grid_side, num_simulations, num_time_steps, num_objects, num_targets,
+						 k = k, lm = lm, sigma = sigma,
+						 per_target_attention = per_target_attention,
+						 nearest_object_bound = nearest_object_bound,
+						 update_strategy = update_strategy,
+						 return_id_accuracy = True)
+		_, chance_accuracies = \
+			simulate_mot(grid_side, num_simulations, num_time_steps, num_objects, num_targets,
+						 k = k, lm = lm, sigma = sigma,
+						 per_target_attention = per_target_attention,
+						 nearest_object_bound = 0,
+						 update_strategy = update_strategy)
+		# chance_accuracies = [0]*num_simulations
+
+		our_accuracy_list.append(np.mean(our_accuracies))
+		our_accuracy_list_se.append(np.std(our_accuracies, ddof=1)/np.sqrt(num_simulations))
+
+		our_id_accuracy_list.append(np.mean(our_id_accuracies))
+		our_id_accuracy_list_se.append(np.std(our_id_accuracies, ddof=1)/np.sqrt(num_simulations))
+
+		chance_accuracy_list.append(np.mean(chance_accuracies))
+		chance_accuracy_list_se.append(np.std(chance_accuracies, ddof=1)/np.sqrt(num_simulations))
+
+		num_target_list.append(num_targets)
+
+	num_target_list         = np.asarray(num_target_list)
+	our_accuracy_list       = 100*np.asarray(our_accuracy_list)
+	our_accuracy_list_se    = 100*np.asarray(our_accuracy_list_se)
+	our_id_accuracy_list    = 100*np.asarray(our_id_accuracy_list)
+	our_id_accuracy_list_se = 100*np.asarray(our_id_accuracy_list_se)
+	chance_accuracy_list    = 100*np.asarray(chance_accuracy_list)
+	chance_accuracy_list_se = 100*np.asarray(chance_accuracy_list_se)
+
+	filename = get_filename(
+		"accuracy-targets-id",
+		per_target_attention = per_target_attention,
+		nearest_object_bound = nearest_object_bound,
+		update_strategy = update_strategy
+	)
+	print(filename)
+
+	plt.clf()
+	plt.title("Accuracy vs Number of targets (sigma={0})".format(sigma))
+
+	plt.errorbar(num_target_list, our_accuracy_list, our_accuracy_list_se,
+				 label="Our Tracking Accuracy")
+	plt.errorbar(num_target_list, our_id_accuracy_list, our_id_accuracy_list_se,
+				 label="Our ID Accuracy")
+	plt.errorbar(num_target_list, chance_accuracy_list, chance_accuracy_list_se,
+				 label="Chance Tracking Performance")
+	plt.xlabel("Number of targets ({0} objects)".format(num_objects))
+	plt.ylabel("Accuracy")
+	plt.ylim(0,100)
+	plt.legend()
+	plt.show()
+
+	write_plot_file(
+		filename = filename,
+		title = "Accuracy vs Number of targets (sigma={0})".format(sigma),
+		xlabel = "Number of targets ({0} objects)".format(num_objects),
+		ylabel = "Accuracy",
+		ylim = [0,100],
+		plot_type = "errorbar",
+		data = {
+			"Our Tracking Accuracy": [num_target_list, our_accuracy_list, our_accuracy_list_se],
+			"Our ID Accuracy": [num_target_list, our_id_accuracy_list, our_id_accuracy_list_se],
+			"Chance Tracking Performance": [num_target_list, chance_accuracy_list, chance_accuracy_list_se]
+		}
+	)
+
+
+
 def plot_momit_id_wrt_time(
 		grid_side, num_simulations, max_time_steps, num_objects, num_targets,
 		k, lm, sigma,
@@ -2128,12 +2214,24 @@ if __name__ == "__main__":
 	# )
 
 	# SECTION 5: Tracking vs ID Performance ====================================
-	plot_id_wrt_time(
+	# plot_id_wrt_time(
+	# 	grid_side = 720,
+	# 	num_simulations = 100,
+	# 	max_time_steps = 400,
+	# 	num_objects = 8,
+	# 	num_targets = 4,
+	# 	k = 0.0005,
+	# 	lm = 0.9,
+	# 	sigma = 1.5,
+	# 	update_strategy="lowest",
+	# 	nearest_object_bound=30,
+	# )
+	plot_id_wrt_targets(
 		grid_side = 720,
 		num_simulations = 100,
-		max_time_steps = 400,
-		num_objects = 8,
-		num_targets = 4,
+		num_time_steps = 20,
+		num_objects = 14,
+		max_num_targets = 8,
 		k = 0.0005,
 		lm = 0.9,
 		sigma = 1.5,
