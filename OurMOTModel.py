@@ -18,16 +18,48 @@ class OurMOTModel:
 
 
 	@staticmethod
-	def nearest_object_heuristic(object_locations, i, j, bound=None):
-		if (i,j) in object_locations: return (i,j), 0
-		object_locations = sorted(object_locations, key=lambda x: (x[0]-i)**2 + (x[1]-j)**2)
-		# print(i, j, "\n", object_locations)
-		if bound is None: return object_locations[0], None
-		else:
-			newi, newj = object_locations[0]
-			dist = np.sqrt((i-newi)**2 + (j-newj)**2)
-			if dist <= bound: return object_locations[0], dist
-			else: return random.choice(object_locations), dist
+	def nearest_object_heuristic(env, i, j, bound=None):
+		ilim, jlim = env.shape
+		object_locations = env.get_object_locations()
+		object_found = False
+		if bound is None: bound = max(ilim, jlim)
+		for ortho_search_radius in range(0, bound):
+			mini = max(i-ortho_search_radius, 0)
+			maxi = min(i+ortho_search_radius, ilim)
+			minj = max(j-ortho_search_radius, 0)
+			maxj = min(j+ortho_search_radius, jlim)
+
+			if object_found: break
+			newi = mini
+			for newj in range(minj, maxj):
+				# print("top", (newi, newj), object_locations)
+				if (newi,newj) in object_locations: object_found=True; break
+
+			if object_found: break
+			newi = maxi-1
+			for newj in range(minj, maxj):
+				# print("bottom", (newi, newj), object_locations)
+				if (newi,newj) in object_locations: object_found=True; break
+
+			if object_found: break
+			newj = minj
+			for newi in range(mini, maxi):
+				# print("left", (newi, newj), object_locations)
+				if (newi,newj) in object_locations: object_found=True; break
+			if object_found: break
+			newj = maxj-1
+			for newi in range(mini, maxi):
+				# print("right", (newi, newj), object_locations)
+				if (newi,newj) in object_locations: object_found=True; break
+
+		if not object_found:
+			newi, newj = random.choice(object_locations)
+
+		# print(object_found, ortho_search_radius, "Old", (i,j), "New", (newi, newj))
+		# print(object_locations)
+		# print()
+		dist = np.sqrt((i-newi)**2 + (j-newj)**2)
+		return (newi, newj), dist
 
 	def process_env(self, env:Environment, observe_targets=False, strategy="random"):
 		if observe_targets:
@@ -43,7 +75,6 @@ class OurMOTModel:
 		# else: do not use target information in env
 		elif strategy == "random":
 			target_locations     = self.target_locations
-			object_locations     = env.get_object_locations()
 			new_target_locations = []
 			# No need to use object identity (aka description or type!) in MOT model
 			for i, loc in enumerate(target_locations):
@@ -53,7 +84,7 @@ class OurMOTModel:
 					i, j = loc
 					if len(target_locations)>1:
 						newloc, dist = OurMOTModel.nearest_object_heuristic(
-							object_locations, i, j, bound=self.nearest_object_bound
+							env, i, j, bound=self.nearest_object_bound
 						)
 						if self.nearest_object_bound is None or dist<=self.nearest_object_bound:
 							new_target_locations.append(newloc)
@@ -62,18 +93,17 @@ class OurMOTModel:
 							self.update_per_target_attention()
 					else:
 						newloc, dist = OurMOTModel.nearest_object_heuristic(
-							object_locations, i, j, bound=None
+							env, i, j, bound=None
 						)
 						new_target_locations.append(newloc)
 			self.target_locations = new_target_locations
 		elif strategy == "lowest":
 			target_locations = self.target_locations
-			object_locations = env.get_object_locations()
 			loc = self.target_locations[0]
 			i, j = loc
 			if len(target_locations)>1:
 				newloc, dist = OurMOTModel.nearest_object_heuristic(
-					object_locations, i, j, bound=self.nearest_object_bound
+					env, i, j, bound=self.nearest_object_bound
 				)
 				if self.nearest_object_bound is None or dist<=self.nearest_object_bound:
 					new_target_locations = target_locations[1:] + [newloc]
@@ -85,7 +115,7 @@ class OurMOTModel:
 					del self.target_id_sequence[id_pos]
 			else:
 				newloc, dist = OurMOTModel.nearest_object_heuristic(
-					object_locations, i, j, bound=None
+					env, i, j, bound=None
 				)
 				new_target_locations = [newloc]
 			assert len(new_target_locations) <= len(target_locations),\
