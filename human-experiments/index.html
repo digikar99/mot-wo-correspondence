@@ -1,0 +1,27 @@
+
+<!DOCTYPE html>
+<head>
+  <script type="text/javascript" src="./pako/dist/pako.min.js"></script>
+  <script type="text/javascript" src="index.js" defer></script>
+  <link rel="stylesheet" href="index.css" type="text/css" media="screen" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+</head>
+<body>
+  <div id="points" style="display:none;">Points: 0</div>
+  <div id="mot-container">
+    <canvas id="mot-canvas"></canvas>
+  </div>
+  <div class="trial-button" id="begin-trial-button"><button disabled>Begin Trial</button></div>
+  <div class="trial-button" id="next-trial-button"><button>Next Trial</button></div>
+  <div id="instructions">
+    <p>The experiment will last about 60 min. Trials are self-paced, and the first 10 trials are practice trials.</p>
+    <p>Assuming a fullHD 1920x1080 display and zoom-settings at 100%, you are requested to position yourself</p>
+    <ul>
+      <li>at a distance of about 60 cm from the screen, if your display is about 20 inches</li>
+      <li>at a distance of about 45 cm from the screen, if your display is about 15 inches</li>
+      <li>at a distance of about 40 cm from the screen, if your display is about 13 inches</li>
+    </ul>
+
+    <p>Note: The browser will go into fullscreen mode on pressing 'Next Trial'.</p>
+  </div>
+</body>

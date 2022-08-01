@@ -1,0 +1,37 @@
+
+body{
+    background-color:black;
+    color:white;
+    height:100vh;
+    width:100vw;
+    overflow-y:hidden;
+    overflow-x:hidden;
+}
+
+#mot-container{
+    margin:auto;
+}
+
+#mot-canvas{
+    border:solid;
+}
+
+.trial-button{
+    margin:15px;
+    width:90px;
+}
+
+#begin-trial-button{
+    position:fixed;
+}
+
+#next-trial-button{
+    position:fixed;
+}
+
+#instructions{
+    position:fixed;
+    width:300px;
+    font-family:sans-serif;
+}
+
