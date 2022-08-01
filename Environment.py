@@ -18,7 +18,7 @@ class Environment:
 		self.object_type_count_map  = object_type_count_map
 		self.num_objects            = sum(object_type_count_map.values())
 		self.num_object_types       = len(object_type_count_map)
-		self.location_object_map    = location_object_map
+		self.location_object_map    = location_object_map # maps from location to object_type
 		self.location_property_map  = location_property_map
 		self.target_location_id_map = target_location_id_map
 		self.num_targets            = num_targets
@@ -121,3 +121,64 @@ class OrnsteinUhlenbeckEnvironment(Environment):
 		self.location_object_map    = new_location_object_map
 		self.location_property_map  = new_location_property_map
 		self.target_location_id_map = new_target_location_id_map
+
+
+class ExperimentalEnvironment(Environment):
+
+	def __init__(self, trial_data, shape):
+		object_list = trial_data["object_list"]
+		num_objects = trial_data["num_objects"]
+		num_targets = trial_data["num_targets"]
+		object_hist_map = {}
+		for (i, o) in enumerate(object_list):
+			object_hist_map[i] = (o["histi"], o["histj"])
+		self.object_hist_map = object_hist_map
+		self.time_elapsed = 0 # in terms of the location in object_hist_map
+		self.num_objects = num_objects
+		self.num_targets = num_targets
+
+		Environment.__init__(
+			self,
+			shape=shape, num_targets=num_targets,
+			object_type_count_map = {0:num_objects}
+		)
+
+	def initialize_random(self):
+		location_object_map    = MultiDict()
+		target_location_id_map = MultiDict()
+		num_objects     = self.num_objects
+		num_targets     = self.num_targets
+		object_hist_map = self.object_hist_map
+
+		for idx in range(num_objects):
+			histi, histj = object_hist_map[idx]
+			loc = (int(histi[0]), int(histj[0]))
+			location_object_map[loc] = 0
+			if idx < num_targets: target_location_id_map[loc] = idx
+		self.location_object_map    = location_object_map
+		self.target_location_id_map = target_location_id_map
+		self.time_elapsed   += 1
+
+	def is_trial_done(self):
+		histi = self.object_hist_map[0][0]
+		return self.time_elapsed == len(histi)
+
+	def update_object_map(self):
+		new_location_object_map    = MultiDict()
+		new_target_location_id_map = MultiDict()
+		object_hist_map  = self.object_hist_map
+		num_objects      = self.num_objects
+		target_locations = self.get_target_locations()
+
+		t = self.time_elapsed
+		for idx in range(num_objects):
+			histi, histj = object_hist_map[idx]
+			loc = (int(histi[t-1]), int(histj[t-1]))
+			newloc = (int(histi[t]), int(histj[t]))
+			new_location_object_map[newloc] = 0
+			if loc in target_locations:
+				new_target_location_id_map[newloc] = idx
+				target_locations.remove(loc)
+		self.location_object_map    = new_location_object_map
+		self.target_location_id_map = new_target_location_id_map
+		self.time_elapsed += 1

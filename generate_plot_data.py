@@ -1,11 +1,12 @@
 
+import os
 import numpy as np
 import random
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from cycler import cycler
 
-from tasks import simulate_mot, simulate_mit
+from tasks import simulate_mot, simulate_mit, simulate_mot_using_experimental_data
 # from OUSpeedOnSameGrid import simulate
 import json
 
@@ -87,6 +88,7 @@ def plot_acc_wrt_targets(
 						 per_target_attention = per_target_attention,
 						 nearest_object_bound = 0,
 						 update_strategy = update_strategy)
+		# chance_accuracies = [0]*num_simulations
 
 		our_accuracy_list.append(np.mean(our_accuracies))
 		our_accuracy_list_se.append(np.std(our_accuracies, ddof=1)/np.sqrt(num_simulations))
@@ -1369,6 +1371,140 @@ def plot_id_wrt_targets(
 	)
 
 
+def plot_exp_id_wrt_targets(
+		grid_side, json_dir, max_num_targets,
+		model_updates_per_time_step, per_target_attention=None,
+		nearest_object_bound=None, update_strategy="random"
+):
+	our_accuracy_dict       = dict()
+	our_accuracy_dict_se    = dict()
+	our_id_accuracy_dict    = dict()
+	our_id_accuracy_dict_se = dict()
+	chance_accuracy_dict    = dict()
+	chance_accuracy_dict_se = dict()
+
+	for i in range(1, max_num_targets+1):
+		our_accuracy_dict[i]    = []
+		our_accuracy_dict_se[i] = []
+		our_id_accuracy_dict[i]    = []
+		our_id_accuracy_dict_se[i] = []
+		chance_accuracy_dict[i]    = []
+		chance_accuracy_dict_se[i] = []
+
+	files = os.listdir(json_dir)
+
+	for f in files:
+		if not f.endswith(".json"): continue
+		_, our_accuracies, _, our_id_accuracies = \
+			simulate_mot_using_experimental_data(
+				grid_side,
+				json_filename=json_dir+f,
+				model_updates_per_time_step = model_updates_per_time_step,
+				max_num_targets = max_num_targets,
+				per_target_attention = per_target_attention,
+				nearest_object_bound = nearest_object_bound,
+				update_strategy = update_strategy,
+				return_id_accuracy = True)
+		_, chance_accuracies = \
+			simulate_mot_using_experimental_data(
+				grid_side,
+				json_filename=json_dir+f,
+				model_updates_per_time_step = model_updates_per_time_step,
+				max_num_targets = max_num_targets,
+				per_target_attention = per_target_attention,
+				nearest_object_bound = 0,
+				update_strategy = update_strategy)
+		# chance_accuracies = [0]*num_simulations
+
+		for i in range(1, max_num_targets+1):
+
+			num_simulations = len(our_accuracies[i])
+
+			our_accuracy_dict[i].append(np.mean(our_accuracies[i]))
+			our_accuracy_dict_se[i].append(np.std(our_accuracies[i], ddof=1)/np.sqrt(num_simulations))
+
+			our_id_accuracy_dict[i].append(np.mean(our_id_accuracies[i]))
+			our_id_accuracy_dict_se[i].append(
+				np.std(our_id_accuracies[i], ddof=1)/np.sqrt(num_simulations)
+			)
+
+			chance_accuracy_dict[i].append(np.mean(chance_accuracies[i]))
+			chance_accuracy_dict_se[i].append(
+				np.std(chance_accuracies[i], ddof=1)/np.sqrt(num_simulations)
+			)
+
+	our_accuracy_list       = []
+	our_accuracy_list_se    = []
+	our_id_accuracy_list    = []
+	our_id_accuracy_list_se = []
+	chance_accuracy_list    = []
+	chance_accuracy_list_se = []
+	num_target_list = []
+
+	for i in range(1, max_num_targets+1):
+		num_target_list.append(i)
+		print(i, our_accuracy_dict[i])
+		our_accuracy_list.append(np.mean(our_accuracy_dict[i]))
+		our_accuracy_list_se.append(
+			np.std(our_accuracy_dict[i], ddof=1) / np.sqrt(len(our_accuracy_dict[i]))
+		)
+		our_id_accuracy_list.append(np.mean(our_id_accuracy_dict[i]))
+		our_id_accuracy_list_se.append(
+			np.std(our_id_accuracy_dict[i], ddof=1) / np.sqrt(len(our_id_accuracy_dict[i]))
+		)
+		chance_accuracy_list.append(np.mean(chance_accuracy_dict[i]))
+		chance_accuracy_list_se.append(
+			np.std(chance_accuracy_dict[i], ddof=1) / np.sqrt(len(chance_accuracy_dict[i]))
+		)
+
+	num_target_list         = np.asarray(num_target_list)
+	our_accuracy_list       = 100*np.asarray(our_accuracy_list)
+	our_accuracy_list_se    = 100*np.asarray(our_accuracy_list_se)
+	our_id_accuracy_list    = 100*np.asarray(our_id_accuracy_list)
+	our_id_accuracy_list_se = 100*np.asarray(our_id_accuracy_list_se)
+	chance_accuracy_list    = 100*np.asarray(chance_accuracy_list)
+	chance_accuracy_list_se = 100*np.asarray(chance_accuracy_list_se)
+
+	print(our_accuracy_list, our_id_accuracy_list, chance_accuracy_list, sep="\n")
+
+	filename = get_filename(
+		"exp-accuracy-targets-id",
+		per_target_attention = per_target_attention,
+		nearest_object_bound = nearest_object_bound,
+		update_strategy = update_strategy
+	)
+	print(filename)
+
+	plt.clf()
+	plt.title("Accuracy vs Number of targets (sigma=1.5)")
+
+	plt.errorbar(num_target_list, our_accuracy_list, our_accuracy_list_se,
+				 label="Our Tracking Accuracy")
+	plt.errorbar(num_target_list, our_id_accuracy_list, our_id_accuracy_list_se,
+				 label="Our ID Accuracy")
+	plt.errorbar(num_target_list, chance_accuracy_list, chance_accuracy_list_se,
+				 label="Chance Tracking Performance")
+	plt.xlabel("Number of targets (14 objects)")
+	plt.ylabel("Accuracy")
+	plt.ylim(0,100)
+	plt.legend()
+	plt.show()
+
+	write_plot_file(
+		filename = filename,
+		title = "Accuracy vs Number of targets (sigma=1.5)",
+		xlabel = "Number of targets (14 objects)",
+		ylabel = "Accuracy",
+		ylim = [0,100],
+		plot_type = "errorbar",
+		data = {
+			"Our Tracking Accuracy": [num_target_list, our_accuracy_list, our_accuracy_list_se],
+			"Our ID Accuracy": [num_target_list, our_id_accuracy_list, our_id_accuracy_list_se],
+			"Chance Tracking Performance": [num_target_list, chance_accuracy_list, chance_accuracy_list_se]
+		}
+	)
+
+
 
 def plot_momit_id_wrt_time(
 		grid_side, num_simulations, max_time_steps, num_objects, num_targets,
@@ -2140,7 +2276,7 @@ def plot_nearest_object_benefit(
 if __name__ == "__main__":
 	np.random.seed(42)
 	# random.seed(43)
-	# momit_acc, our_acc = simulate_mot(
+	# acc = simulate_mot(
 	# 	grid_side = 720,
 	# 	num_simulations = 10,
 	# 	num_time_steps = 50,
@@ -2148,10 +2284,10 @@ if __name__ == "__main__":
 	# 	num_targets = 4,
 	# 	k = 0.0005,
 	# 	lm = 0.9,
-	# 	sigma = 4
+	# 	sigma = 2,
+	# 	# nearest_object_bound=30
 	# )
-	# print(momit_acc)
-	# print(our_acc)
+	# print(acc)
 
 	# # SECTION 1: Accuracy vs Number of Targets =================================
 	# plot_acc_wrt_targets(
@@ -2226,18 +2362,18 @@ if __name__ == "__main__":
 	# 	update_strategy="lowest",
 	# 	nearest_object_bound=30,
 	# )
-	plot_id_wrt_targets(
-		grid_side = 720,
-		num_simulations = 100,
-		num_time_steps = 20,
-		num_objects = 14,
-		max_num_targets = 8,
-		k = 0.0005,
-		lm = 0.9,
-		sigma = 1.5,
-		update_strategy="lowest",
-		nearest_object_bound=30,
-	)
+	# plot_id_wrt_targets(
+	# 	grid_side = 720,
+	# 	num_simulations = 100,
+	# 	num_time_steps = 20,
+	# 	num_objects = 14,
+	# 	max_num_targets = 8,
+	# 	k = 0.0005,
+	# 	lm = 0.9,
+	# 	sigma = 1.5,
+	# 	update_strategy="lowest",
+	# 	nearest_object_bound=30,
+	# )
 
 
 	# SECTION 6: Swap Count ====================================================
@@ -2253,18 +2389,18 @@ if __name__ == "__main__":
 	# 	update_strategy="lowest",
 	# 	nearest_object_bound=30,
 	# )
-	plot_id_swaps(
-		grid_side = 720,
-		num_simulations = 100,
-		num_time_steps = 400,
-		num_objects = 8,
-		num_targets = 4,
-		k = 0.0005,
-		lm = 0.9,
-		sigma = 1.5,
-		update_strategy="lowest",
-		nearest_object_bound=30,
-	)
+	# plot_id_swaps(
+	# 	grid_side = 720,
+	# 	num_simulations = 100,
+	# 	num_time_steps = 400,
+	# 	num_objects = 8,
+	# 	num_targets = 4,
+	# 	k = 0.0005,
+	# 	lm = 0.9,
+	# 	sigma = 1.5,
+	# 	update_strategy="lowest",
+	# 	nearest_object_bound=30,
+	# )
 
 
 	# SECTION 7: Basic graphs but with MOMIT ===================================
@@ -2384,3 +2520,25 @@ if __name__ == "__main__":
 	# 	max_sigma = 4,
 	# 	nearest_object_bound=30
 	# )
+
+	# SECTION 10: Comparison of data against experimental data =================
+	# print(
+	# 	*simulate_mot_using_experimental_data(
+	# 		grid_side=720,
+	# 		max_num_targets=8,
+	# 		json_filename="human-experiments/data/pretty-test.json",
+	# 		model_updates_per_time_step=1,
+	# 		update_strategy="lowest",
+	# 		nearest_object_bound=30,
+	# 		return_id_accuracy=True,
+	# 	),
+	# 	sep="\n"
+	# )
+	plot_exp_id_wrt_targets(
+		grid_side=720,
+		max_num_targets=8,
+		json_dir = "human-experiments/data/",
+		update_strategy="lowest",
+		nearest_object_bound=30,
+		model_updates_per_time_step=5,
+	)

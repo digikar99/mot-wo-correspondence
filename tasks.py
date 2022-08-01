@@ -1,7 +1,9 @@
 
-from Environment import OrnsteinUhlenbeckEnvironment
+from Environment import OrnsteinUhlenbeckEnvironment, ExperimentalEnvironment
 from MOMIT import MOMIT
 from OurMOTModel import OurMOTModel
+import json
+import math
 
 
 def evaluate_tracking(env, model):
@@ -217,6 +219,130 @@ def simulate_mot(grid_side, num_simulations, num_time_steps, num_objects,
 	if return_id_accuracy: return_values += [momit_id_accuracies, our_id_accuracies]
 	if return_swap_count: return_values += [our_tt_swaps, our_tn_swaps, our_both_swaps, our_none_swaps]
 	return return_values
+
+
+def simulate_mot_using_experimental_data(
+		grid_side, max_num_targets, json_filename, model_updates_per_time_step, episodic_buffer_size=4,
+		episodic_buffer_decay_rate=0.9, per_target_attention=None, nearest_object_bound=None,
+		update_strategy="random", return_id_accuracy=False, use_static_indices=True,
+		id_only_for_perfect_tracking=False, return_swap_count=False):
+
+	momit_tracking_accuracies = {}
+	our_tracking_accuracies   = {}
+
+	momit_id_accuracies = {}
+	our_id_accuracies   = {}
+
+	for i in range(1, max_num_targets+1):
+		momit_tracking_accuracies[i] = []
+		our_tracking_accuracies[i]   = []
+		momit_id_accuracies[i] = []
+		our_id_accuracies[i]   = []
+
+	our_tt_swaps = []
+	our_tn_swaps = []
+	our_both_swaps = []
+	our_none_swaps = []
+
+	with open(json_filename) as f: json_data = json.load(f)
+	all_trial_data  = json_data["all_trial_data"]
+	num_simulations = len(all_trial_data)
+
+	# IMPORTANT: We want to maintain the semantics of time_step
+	# One time_step denotes one OU update; thus per_ou_update and per_time_step are synonymous
+
+	session_details = json_data["session_details"]
+	refreshes_per_ou_update = 1 / session_details["ou_updates_per_refresh"]
+	time_steps_per_model_update = 1 / model_updates_per_time_step
+
+	# print("Will update model every {0} time steps".format(model_updates_per_time_step))
+	for simulation_idx in range(num_simulations):
+	# for simulation_idx in range(2):
+
+		trial_data     = all_trial_data[simulation_idx]
+		num_time_steps = trial_data["num_time_steps"]
+		num_targets = trial_data["num_targets"]
+
+		env = ExperimentalEnvironment(
+			shape = (grid_side, grid_side),
+			trial_data = trial_data,
+		)
+		env.initialize_random()
+		momit_model = MOMIT(episodic_buffer_size, episodic_buffer_decay_rate, {0: 0.2},
+							use_static_indices = use_static_indices)
+		our_model = OurMOTModel(
+			num_targets,
+			per_target_attention = per_target_attention,
+			nearest_object_bound = nearest_object_bound
+		)
+		momit_model.process_env(env, observe_targets=True)
+		our_model.process_env(env, observe_targets=True)
+		model_updates_so_far = 0
+
+		# print(env.time_elapsed, -1, env.time_elapsed / refreshes_per_ou_update)
+		# print("env", env.get_target_locations())
+		# print("our", our_model.get_attended_locations(env))
+
+
+		for t in range(num_time_steps):
+			while (not env.is_trial_done())\
+				  and (env.time_elapsed / refreshes_per_ou_update < t):
+				env.update_object_map()
+				# print(env.time_elapsed, t, env.time_elapsed / refreshes_per_ou_update)
+				# print("env", env.get_target_locations())
+			momit_model.process_env(env)
+				# print("our before", our_model.num_targets, our_model.get_attended_locations(env))
+			our_model.process_env(env, strategy=update_strategy)
+				# print("our after", our_model.num_targets, our_model.get_attended_locations(env))
+
+
+		momit_tracking_accuracy = evaluate_tracking(env, momit_model)
+		our_tracking_accuracy   = evaluate_tracking(env, our_model)
+
+		momit_id_accuracy       = evaluate_id(env, momit_model)
+		our_id_accuracy, tt_swaps, tn_swaps, both_swaps, none_swaps = \
+			evaluate_id(env, our_model, return_swaps=True)
+
+		momit_tracking_accuracies[num_targets].append(momit_tracking_accuracy)
+		our_tracking_accuracies[num_targets].append(our_tracking_accuracy)
+
+		if not id_only_for_perfect_tracking or momit_tracking_accuracy==1:
+			momit_id_accuracies[num_targets].append(momit_id_accuracy)
+		if not id_only_for_perfect_tracking or our_tracking_accuracy==1:
+			our_id_accuracies[num_targets].append(our_id_accuracy)
+
+		# tt_swaps, tn_swaps, both_swaps, none_swaps = 0, 0, 0, 0
+		# if our_id_accuracy == 1: none_swaps = 1
+		# else:
+		# 	num_lost_targets = (1-our_tracking_accuracy)*num_targets
+		# 	num_lost_ids     = (1-our_id_accuracy)*num_targets
+
+		# 	tt_swaps = (num_lost_targets == 0) or \
+		# 		(num_lost_targets == 1 and num_lost_ids > 1) or \
+		# 		(num_lost_targets > 1)
+		# 	tn_swaps = (num_lost_targets == 1 and num_lost_ids == 1) or \
+		# 		(num_lost_targets >= 1 and num_lost_ids > 1)
+
+		# 	tt_swaps, tn_swaps = int(tt_swaps), int(tn_swaps)
+
+		# 	# if tn_swaps and tt_swaps:
+		# 		# tt_swaps, tn_swaps, both_swaps = 0,0,1
+		# 	both_swaps = tt_swaps * tn_swaps
+
+		our_tt_swaps.append(tt_swaps)
+		our_tn_swaps.append(tn_swaps)
+		our_both_swaps.append(both_swaps)
+		our_none_swaps.append(none_swaps)
+
+		# print(our_tracking_accuracy, our_id_accuracy, tt_swaps, tn_swaps, both_swaps, none_swaps)
+
+
+	return_values = [momit_tracking_accuracies, our_tracking_accuracies]
+
+	if return_id_accuracy: return_values += [momit_id_accuracies, our_id_accuracies]
+	if return_swap_count: return_values += [our_tt_swaps, our_tn_swaps, our_both_swaps, our_none_swaps]
+	return return_values
+
 
 
 def simulate_mit(grid_side, num_simulations, num_time_steps, num_objects,
