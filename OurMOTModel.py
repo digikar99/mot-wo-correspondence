@@ -25,31 +25,33 @@ class OurMOTModel:
 		if bound is None: bound = max(ilim, jlim)
 		for ortho_search_radius in range(0, bound):
 			mini = max(i-ortho_search_radius, 0)
-			maxi = min(i+ortho_search_radius, ilim)
+			maxi = min(i+ortho_search_radius+1, ilim)
 			minj = max(j-ortho_search_radius, 0)
-			maxj = min(j+ortho_search_radius, jlim)
+			maxj = min(j+ortho_search_radius+1, jlim)
+
+			# print(mini, maxi, minj, maxj)
 
 			if object_found: break
 			newi = mini
 			for newj in range(minj, maxj):
-				# print("top", (newi, newj), object_locations)
+				# print("  top", (newi, newj), object_locations)
 				if (newi,newj) in object_locations: object_found=True; break
 
 			if object_found: break
 			newi = maxi-1
 			for newj in range(minj, maxj):
-				# print("bottom", (newi, newj), object_locations)
+				# print("  bottom", (newi, newj), object_locations)
 				if (newi,newj) in object_locations: object_found=True; break
 
 			if object_found: break
 			newj = minj
 			for newi in range(mini, maxi):
-				# print("left", (newi, newj), object_locations)
+				# print("  left", (newi, newj), object_locations)
 				if (newi,newj) in object_locations: object_found=True; break
 			if object_found: break
 			newj = maxj-1
 			for newi in range(mini, maxi):
-				# print("right", (newi, newj), object_locations)
+				# print("  right", (newi, newj), object_locations)
 				if (newi,newj) in object_locations: object_found=True; break
 
 		if not object_found:
@@ -106,7 +108,9 @@ class OurMOTModel:
 					env, i, j, bound=self.nearest_object_bound
 				)
 				if self.nearest_object_bound is None or dist<=self.nearest_object_bound:
+					# print("  old", target_locations)
 					new_target_locations = target_locations[1:] + [newloc]
+					# print("  new", new_target_locations)
 				else:
 					new_target_locations = target_locations[1:]
 					# TODO: Remove the appropriate ID in target-ID sequence
@@ -130,15 +134,13 @@ class OurMOTModel:
 		target_locations = self.target_locations
 		object_locations = env.get_object_locations()
 		attended_locations = []
+		nearest_object_bound = self.nearest_object_bound
+		# print("  in get_attended_locations", nearest_object_bound, target_locations)
 		for loc in target_locations:
-			nearest_object_bound = self.nearest_object_bound
-			nearest_object_loc = sorted(
-				object_locations,
-				key = lambda oloc: ((oloc[0]-loc[0])**2 + (oloc[1]-loc[1])**2),
-			)[0]
-			i1, j1 = loc
-			i2, j2 = nearest_object_loc
-			dist = np.sqrt((i1-i2)**2 + (j1-j2)**2)
+			i, j = loc
+			nearest_object_loc, dist = OurMOTModel.nearest_object_heuristic(
+				env, i, j, nearest_object_bound
+			)
 			if nearest_object_bound is None:
 				attended_locations.append(nearest_object_loc)
 			elif dist < nearest_object_bound:
