@@ -285,15 +285,33 @@ def simulate_mot_using_experimental_data(
 
 
 		for t in range(num_time_steps):
-			while (not env.is_trial_done())\
-				  and (env.time_elapsed / refreshes_per_ou_update < t):
-				env.update_object_map()
-				# print(env.time_elapsed, t, env.time_elapsed / refreshes_per_ou_update)
-				# print("env", env.get_target_locations())
-			momit_model.process_env(env)
-				# print("our before", our_model.num_targets, our_model.get_attended_locations(env))
-			our_model.process_env(env, strategy=update_strategy)
-				# print("our after", our_model.num_targets, our_model.get_attended_locations(env))
+			for _ in range(math.ceil(max(refreshes_per_ou_update, model_updates_per_time_step))):
+				if env.is_trial_done(): continue
+				if (env.time_elapsed < (t + 1) * refreshes_per_ou_update):
+					env.update_object_map()
+				if model_updates_so_far < (t + 1) * model_updates_per_time_step:
+					momit_model.process_env(env)
+					our_model.process_env(env, strategy=update_strategy)
+					model_updates_so_far += 1
+
+			# while (not env.is_trial_done())\
+			# 	  and (env.time_elapsed / refreshes_per_ou_update < t):
+			# 	env.update_object_map()
+			# 	# print(env.time_elapsed, t, env.time_elapsed / refreshes_per_ou_update)
+			# 	# print("env", env.get_target_locations())
+			# 	if model_updates_so_far < (t + 1) * model_updates_per_time_step:
+			# 		momit_model.process_env(env)
+			# 		# print("our before", our_model.num_targets, our_model.get_attended_locations(env))
+			# 		our_model.process_env(env, strategy=update_strategy)
+			# 		# print("our after", our_model.num_targets, our_model.get_attended_locations(env))
+			# 		model_updates_so_far += 1
+
+			# while model_updates_so_far < (t + 1) * model_updates_per_time_step:
+			# 	momit_model.process_env(env)
+			# 	# print("our before", our_model.num_targets, our_model.get_attended_locations(env))
+			# 	our_model.process_env(env, strategy=update_strategy)
+			# 	# print("our after", our_model.num_targets, our_model.get_attended_locations(env))
+			# 	model_updates_so_far += 1
 
 
 		momit_tracking_accuracy = evaluate_tracking(env, momit_model)
