@@ -12,6 +12,7 @@ class OurMOTModel:
 		self.target_locations = None
 		self.nearest_object_bound = nearest_object_bound
 		self.target_id_sequence = None
+		self.num_updates = 0
 
 	def update_per_target_attention(self):
 		self.per_target_attention = [1,0.85,0.7,0.6,0.5,0.3,0.1,0.03][self.num_targets-1]
@@ -103,6 +104,7 @@ class OurMOTModel:
 			target_locations = self.target_locations
 			loc = self.target_locations[0]
 			i, j = loc
+			self.num_updates += 1
 			if len(target_locations)>1:
 				newloc, dist = OurMOTModel.nearest_object_heuristic(
 					env, i, j, bound=self.nearest_object_bound
@@ -111,9 +113,22 @@ class OurMOTModel:
 					# print("  old", target_locations)
 					new_target_locations = target_locations[1:] + [newloc]
 					# print("  new", new_target_locations)
+					# ID update; TODO: Explain
+					# TODO: Incorporate two different parameters for tracking vs ID update
+					# if self.num_updates % 2 == 0:
+					if random.random() < 1:
+						sorted_newloc = sorted(new_target_locations)
+						sorted_loc    = sorted(target_locations)
+						newloc_id_pos = sorted_newloc.index(newloc)
+						loc_id_pos    = sorted_loc.index(loc)
+						idx = self.target_id_sequence[loc_id_pos]
+						del self.target_id_sequence[loc_id_pos]
+						self.target_id_sequence.insert(newloc_id_pos, idx)
 				else:
+					# The object corresponding to the attended location is irrecoverable,
+					# so stop updating it, forget about it.
 					new_target_locations = target_locations[1:]
-					# TODO: Remove the appropriate ID in target-ID sequence
+					# Remove the appropriate ID in target-ID sequence
 					target_locations = sorted(target_locations)
 					id_pos = target_locations.index(loc)
 					del self.target_id_sequence[id_pos]
