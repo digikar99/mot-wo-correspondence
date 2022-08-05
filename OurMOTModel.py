@@ -13,6 +13,7 @@ class OurMOTModel:
 		self.nearest_object_bound = nearest_object_bound
 		self.target_id_sequence = None
 		self.num_updates = 0
+		self.update_idx = 0
 
 	def update_per_target_attention(self):
 		self.per_target_attention = [1,0.85,0.7,0.6,0.5,0.3,0.1,0.03][self.num_targets-1]
@@ -102,36 +103,49 @@ class OurMOTModel:
 			self.target_locations = new_target_locations
 		elif strategy == "lowest":
 			target_locations = self.target_locations
-			loc = self.target_locations[0]
+			update_idx = self.update_idx
+			loc = self.target_locations[update_idx]
 			i, j = loc
 			self.num_updates += 1
+			new_target_locations = target_locations.copy()
 			if len(target_locations)>1:
 				newloc, dist = OurMOTModel.nearest_object_heuristic(
 					env, i, j, bound=self.nearest_object_bound
 				)
 				if self.nearest_object_bound is None or dist<=self.nearest_object_bound:
 					# print("  old", target_locations)
-					new_target_locations = target_locations[1:] + [newloc]
+					new_target_locations[update_idx] = newloc
 					# print("  new", new_target_locations)
-					# ID update; TODO: Explain
 					# TODO: Incorporate two different parameters for tracking vs ID update
 					# if self.num_updates % 2 == 0:
-					if random.random() < 1:
-						sorted_newloc = sorted(new_target_locations)
-						sorted_loc    = sorted(target_locations)
-						newloc_id_pos = sorted_newloc.index(newloc)
-						loc_id_pos    = sorted_loc.index(loc)
-						idx = self.target_id_sequence[loc_id_pos]
-						del self.target_id_sequence[loc_id_pos]
-						self.target_id_sequence.insert(newloc_id_pos, idx)
+					new_idx = update_idx+1
+					while new_idx < len(target_locations):
+						if new_target_locations[update_idx] > new_target_locations[new_idx]:
+							del new_target_locations[update_idx]
+							new_target_locations.insert(new_idx, newloc)
+							idx = self.target_id_sequence[update_idx]
+							del self.target_id_sequence[update_idx]
+							self.target_id_sequence.insert(new_idx, idx)
+							break
+						new_idx += 1
+					new_idx = 0
+					while new_idx < update_idx:
+						if new_target_locations[update_idx] < new_target_locations[new_idx]:
+							del new_target_locations[update_idx]
+							new_target_locations.insert(new_idx, newloc)
+							idx = self.target_id_sequence[update_idx]
+							del self.target_id_sequence[update_idx]
+							self.target_id_sequence.insert(new_idx, idx)
+							break
+						new_idx += 1
 				else:
 					# The object corresponding to the attended location is irrecoverable,
 					# so stop updating it, forget about it.
-					new_target_locations = target_locations[1:]
+					del new_target_locations[update_idx]
 					# Remove the appropriate ID in target-ID sequence
-					target_locations = sorted(target_locations)
-					id_pos = target_locations.index(loc)
-					del self.target_id_sequence[id_pos]
+					# target_locations = sorted(target_locations)
+					# id_pos = target_locations.index(loc)
+					del self.target_id_sequence[self.update_idx]
 			else:
 				newloc, dist = OurMOTModel.nearest_object_heuristic(
 					env, i, j, bound=None
@@ -141,6 +155,8 @@ class OurMOTModel:
 				"Target locations: {0}\nNew target locations: {1}\nDist: {2}".\
 				format(target_locations, new_target_locations, dist)
 			self.target_locations = new_target_locations
+			self.update_idx += 1
+			self.update_idx %= len(self.target_locations)
 		else:
 			raise Exception("Unknown strategy: " + strategy)
 
