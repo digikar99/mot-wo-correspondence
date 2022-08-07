@@ -1326,12 +1326,12 @@ def plot_id_wrt_targets(
 		num_target_list.append(num_targets)
 
 	num_target_list         = np.asarray(num_target_list)
-	our_accuracy_list       = 100*np.asarray(our_accuracy_list)
-	our_accuracy_list_se    = 100*np.asarray(our_accuracy_list_se)
-	our_id_accuracy_list    = 100*np.asarray(our_id_accuracy_list)
-	our_id_accuracy_list_se = 100*np.asarray(our_id_accuracy_list_se)
-	chance_accuracy_list    = 100*np.asarray(chance_accuracy_list)
-	chance_accuracy_list_se = 100*np.asarray(chance_accuracy_list_se)
+	our_accuracy_list       = np.arange(1,max_num_targets+1)*np.asarray(our_accuracy_list)
+	our_accuracy_list_se    = np.arange(1,max_num_targets+1)*np.asarray(our_accuracy_list_se)
+	our_id_accuracy_list    = np.arange(1,max_num_targets+1)*np.asarray(our_id_accuracy_list)
+	our_id_accuracy_list_se = np.arange(1,max_num_targets+1)*np.asarray(our_id_accuracy_list_se)
+	chance_accuracy_list    = np.arange(1,max_num_targets+1)*np.asarray(chance_accuracy_list)
+	chance_accuracy_list_se = np.arange(1,max_num_targets+1)*np.asarray(chance_accuracy_list_se)
 
 	filename = get_filename(
 		"accuracy-targets-id",
@@ -1352,29 +1352,30 @@ def plot_id_wrt_targets(
 				 label="Chance Tracking Performance")
 	plt.xlabel("Number of targets ({0} objects)".format(num_objects))
 	plt.ylabel("Accuracy")
-	plt.ylim(0,100)
+	plt.ylim(0,8)
 	plt.legend()
 	plt.show()
 
-	write_plot_file(
-		filename = filename,
-		title = "Accuracy vs Number of targets (sigma={0})".format(sigma),
-		xlabel = "Number of targets ({0} objects)".format(num_objects),
-		ylabel = "Accuracy",
-		ylim = [0,100],
-		plot_type = "errorbar",
-		data = {
-			"Our Tracking Accuracy": [num_target_list, our_accuracy_list, our_accuracy_list_se],
-			"Our ID Accuracy": [num_target_list, our_id_accuracy_list, our_id_accuracy_list_se],
-			"Chance Tracking Performance": [num_target_list, chance_accuracy_list, chance_accuracy_list_se]
-		}
-	)
+	# write_plot_file(
+	# 	filename = filename,
+	# 	title = "Accuracy vs Number of targets (sigma={0})".format(sigma),
+	# 	xlabel = "Number of targets ({0} objects)".format(num_objects),
+	# 	ylabel = "Accuracy",
+	# 	ylim = [0,8],
+	# 	plot_type = "errorbar",
+	# 	data = {
+	# 		"Our Tracking Accuracy": [num_target_list, our_accuracy_list, our_accuracy_list_se],
+	# 		"Our ID Accuracy": [num_target_list, our_id_accuracy_list, our_id_accuracy_list_se],
+	# 		"Chance Tracking Performance": [num_target_list, chance_accuracy_list, chance_accuracy_list_se]
+	# 	}
+	# )
 
 
 def plot_exp_id_wrt_targets(
-		grid_side, json_dir, max_num_targets,
-		model_updates_per_time_step, per_target_attention=None,
-		nearest_object_bound=None, update_strategy="random"
+		grid_side, max_num_targets,
+		model_updates_per_time_step, json_files=None, json_dir=None, per_target_attention=None,
+		nearest_object_bound=None, update_strategy="random", plot_accuracies=True,
+		plot_correct_responses_count=False, plot_confident_responses_count=False
 ):
 	our_accuracy_dict       = dict()
 	our_accuracy_dict_se    = dict()
@@ -1382,6 +1383,7 @@ def plot_exp_id_wrt_targets(
 	our_id_accuracy_dict_se = dict()
 	chance_accuracy_dict    = dict()
 	chance_accuracy_dict_se = dict()
+	confident_responses_count = dict()
 
 	for i in range(1, max_num_targets+1):
 		our_accuracy_dict[i]    = []
@@ -1390,25 +1392,33 @@ def plot_exp_id_wrt_targets(
 		our_id_accuracy_dict_se[i] = []
 		chance_accuracy_dict[i]    = []
 		chance_accuracy_dict_se[i] = []
+		confident_responses_count[i] = 0
 
-	files = os.listdir(json_dir)
+	if json_dir is None:
+		files = json_files
+	else:
+		files = list(map(lambda f : json_dir+f, os.listdir(json_dir)))
 
 	for f in files:
 		if not f.endswith(".json"): continue
-		_, our_accuracies, _, our_id_accuracies = \
+		_, our_accuracies, _, our_id_accuracies, confident_responses = \
 			simulate_mot_using_experimental_data(
 				grid_side,
-				json_filename=json_dir+f,
+				json_filename=f,
 				model_updates_per_time_step = model_updates_per_time_step,
 				max_num_targets = max_num_targets,
 				per_target_attention = per_target_attention,
 				nearest_object_bound = nearest_object_bound,
 				update_strategy = update_strategy,
-				return_id_accuracy = True)
+				return_id_accuracy = True,
+				# id_only_for_perfect_tracking=True
+				return_final_attended_location_count = True
+			)
+		# print(our_id_accuracies)
 		_, chance_accuracies = \
 			simulate_mot_using_experimental_data(
 				grid_side,
-				json_filename=json_dir+f,
+				json_filename=f,
 				model_updates_per_time_step = model_updates_per_time_step,
 				max_num_targets = max_num_targets,
 				per_target_attention = per_target_attention,
@@ -1428,6 +1438,8 @@ def plot_exp_id_wrt_targets(
 				np.std(our_id_accuracies[i], ddof=1)/np.sqrt(num_simulations)
 			)
 
+			confident_responses_count[i] += confident_responses[i]
+
 			chance_accuracy_dict[i].append(np.mean(chance_accuracies[i]))
 			chance_accuracy_dict_se[i].append(
 				np.std(chance_accuracies[i], ddof=1)/np.sqrt(num_simulations)
@@ -1439,11 +1451,11 @@ def plot_exp_id_wrt_targets(
 	our_id_accuracy_list_se = []
 	chance_accuracy_list    = []
 	chance_accuracy_list_se = []
+	confident_responses_count_list = []
 	num_target_list = []
 
 	for i in range(1, max_num_targets+1):
 		num_target_list.append(i)
-		print(i, our_accuracy_dict[i])
 		our_accuracy_list.append(np.mean(our_accuracy_dict[i]))
 		our_accuracy_list_se.append(
 			np.std(our_accuracy_dict[i], ddof=1) / np.sqrt(len(our_accuracy_dict[i]))
@@ -1457,52 +1469,135 @@ def plot_exp_id_wrt_targets(
 			np.std(chance_accuracy_dict[i], ddof=1) / np.sqrt(len(chance_accuracy_dict[i]))
 		)
 
-	num_target_list         = np.asarray(num_target_list)
-	our_accuracy_list       = 100*np.asarray(our_accuracy_list)
-	our_accuracy_list_se    = 100*np.asarray(our_accuracy_list_se)
-	our_id_accuracy_list    = 100*np.asarray(our_id_accuracy_list)
-	our_id_accuracy_list_se = 100*np.asarray(our_id_accuracy_list_se)
-	chance_accuracy_list    = 100*np.asarray(chance_accuracy_list)
-	chance_accuracy_list_se = 100*np.asarray(chance_accuracy_list_se)
+		confident_responses_count_list.append(confident_responses_count[i])
 
-	print(our_accuracy_list, our_id_accuracy_list, chance_accuracy_list, sep="\n")
+	num_target_array = np.asarray(num_target_list)
+	confident_responses_count_array = np.asarray(confident_responses_count_list)
 
-	filename = get_filename(
-		"exp-accuracy-targets-id",
-		per_target_attention = per_target_attention,
-		nearest_object_bound = nearest_object_bound,
-		update_strategy = update_strategy
-	)
-	print(filename)
+	if plot_accuracies:
+		our_accuracy_array       = 100 * np.asarray(our_accuracy_list)
+		our_accuracy_array_se    = 100 * np.asarray(our_accuracy_list_se)
+		our_id_accuracy_array    = 100 * np.asarray(our_id_accuracy_list)
+		our_id_accuracy_array_se = 100 * np.asarray(our_id_accuracy_list_se)
+		chance_accuracy_array    = 100 * np.asarray(chance_accuracy_list)
+		chance_accuracy_array_se = 100 * np.asarray(chance_accuracy_list_se)
 
-	plt.clf()
-	plt.title("Accuracy vs Number of targets (sigma=1.5)")
+		filename = get_filename(
+			"exp-model-accuracy-targets-id-" + str(int(model_updates_per_time_step*10)),
+			per_target_attention = per_target_attention,
+			nearest_object_bound = nearest_object_bound,
+			update_strategy = update_strategy
+		)
+		print(filename)
 
-	plt.errorbar(num_target_list, our_accuracy_list, our_accuracy_list_se,
-				 label="Our Tracking Accuracy")
-	plt.errorbar(num_target_list, our_id_accuracy_list, our_id_accuracy_list_se,
-				 label="Our ID Accuracy")
-	plt.errorbar(num_target_list, chance_accuracy_list, chance_accuracy_list_se,
-				 label="Chance Tracking Performance")
-	plt.xlabel("Number of targets (14 objects)")
-	plt.ylabel("Accuracy")
-	plt.ylim(0,100)
-	plt.legend()
-	plt.show()
+		plt.clf()
+		plt.title("Model Performance:\nAccuracy vs Number of targets\n(sigma=1.5)")
 
-	write_plot_file(
-		filename = filename,
-		title = "Accuracy vs Number of targets (sigma=1.5)",
-		xlabel = "Number of targets (14 objects)",
-		ylabel = "Accuracy",
-		ylim = [0,100],
-		plot_type = "errorbar",
-		data = {
-			"Our Tracking Accuracy": [num_target_list, our_accuracy_list, our_accuracy_list_se],
-			"Our ID Accuracy": [num_target_list, our_id_accuracy_list, our_id_accuracy_list_se],
-			"Chance Tracking Performance": [num_target_list, chance_accuracy_list, chance_accuracy_list_se]
-		}
-	)
+		plt.errorbar(num_target_array, our_accuracy_array, our_accuracy_array_se,
+					 label="Our Tracking Accuracy")
+		plt.errorbar(num_target_array, our_id_accuracy_array, our_id_accuracy_array_se,
+					 label="Our ID Accuracy")
+		plt.errorbar(num_target_array, chance_accuracy_array, chance_accuracy_array_se,
+					 label="Chance Tracking Performance")
+		plt.xlabel("Number of targets (14 objects)")
+		plt.ylabel("Accuracy")
+		plt.ylim(0,100)
+		plt.legend()
+		plt.show()
+
+		write_plot_file(
+			filename = filename,
+			title = "Model Performance:\nAccuracy vs Number of targets\n(sigma=1.5)",
+			xlabel = "Number of targets (14 objects)",
+			ylabel = "Accuracy",
+			ylim = [0,100],
+			plot_type = "errorbar",
+			data = {
+				"Our Tracking Accuracy": [num_target_array, our_accuracy_array, our_accuracy_array_se],
+				"Our ID Accuracy": [num_target_array, our_id_accuracy_array, our_id_accuracy_array_se],
+				"Chance Tracking Performance": [num_target_array, chance_accuracy_array, chance_accuracy_array_se]
+			}
+		)
+
+	if plot_correct_responses_count:
+		our_accuracy_array       = np.arange(1, max_num_targets+1) * np.asarray(our_accuracy_list)
+		our_accuracy_array_se    = np.arange(1, max_num_targets+1) * np.asarray(our_accuracy_list_se)
+		our_id_accuracy_array    = np.arange(1, max_num_targets+1) * np.asarray(our_id_accuracy_list)
+		our_id_accuracy_array_se = np.arange(1, max_num_targets+1) * np.asarray(our_id_accuracy_list_se)
+		chance_accuracy_array    = np.arange(1, max_num_targets+1) * np.asarray(chance_accuracy_list)
+		chance_accuracy_array_se = np.arange(1, max_num_targets+1) * np.asarray(chance_accuracy_list_se)
+
+		filename = get_filename(
+			"exp-model-correct-targets-id-" + str(int(model_updates_per_time_step*10)),
+			per_target_attention = per_target_attention,
+			nearest_object_bound = nearest_object_bound,
+			update_strategy = update_strategy
+		)
+		print(filename)
+
+		plt.clf()
+		plt.title("Model Performance:\nCorrect response counts vs Number of targets\n(sigma=1.5)")
+
+		plt.errorbar(num_target_array, our_accuracy_array, our_accuracy_array_se,
+					 label="Tracking Responses")
+		plt.errorbar(num_target_array, our_id_accuracy_array, our_id_accuracy_array_se,
+					 label="ID Responses")
+		plt.errorbar(num_target_array, chance_accuracy_array, chance_accuracy_array_se,
+					 label="Chance Tracking Responses")
+		plt.xlabel("Number of targets (14 objects)")
+		plt.ylabel("Number of correct responses")
+		plt.ylim(0,8)
+		plt.legend()
+		plt.show()
+
+		write_plot_file(
+			filename = filename,
+			title = "Model Performance:\nCorrect response counts vs Number of targets (sigma=1.5)",
+			xlabel = "Number of targets (14 objects)",
+			ylabel = "Number of correct responses",
+			ylim = [0,8],
+			plot_type = "errorbar",
+			data = {
+				"Tracking Responses": [num_target_array, our_accuracy_array, our_accuracy_array_se],
+				"ID Responses": [num_target_array, our_id_accuracy_array, our_id_accuracy_array_se],
+				"Chance Tracking Responses": [num_target_array, chance_accuracy_array, chance_accuracy_array_se]
+			}
+		)
+
+	if plot_confident_responses_count:
+		filename = get_filename(
+			"exp-model-confident-targets-id-" + str(int(model_updates_per_time_step*10)),
+			per_target_attention = per_target_attention,
+			nearest_object_bound = nearest_object_bound,
+			update_strategy = update_strategy
+		)
+		print(filename)
+
+		plt.clf()
+		plt.title("Model Performance:\nConfident response counts vs Number of targets\n(sigma=1.5)")
+
+		plt.bar(
+			x = num_target_array,
+			height = confident_responses_count_array,
+		)
+		plt.xlabel("Number of targets (14 objects)")
+		plt.ylabel("Number of confident responses")
+		plt.show()
+
+		write_plot_file(
+			filename = filename,
+			title = "Model Performance:\nConfident response counts vs Number of targets\n(sigma=1.5)",
+			xlabel = "Number of targets (14 objects)",
+			ylabel = "Number of confident responses",
+			ylim = [None,None],
+			plot_type = "bar",
+			data = {
+				"": [num_target_array, confident_responses_count_array],
+			}
+		)
+
+
+
 
 
 
@@ -2362,10 +2457,22 @@ if __name__ == "__main__":
 	# 	update_strategy="lowest",
 	# 	nearest_object_bound=30,
 	# )
+	# plot_id_wrt_time(
+	# 	grid_side = 720,
+	# 	num_simulations = 50,
+	# 	max_time_steps = 50,
+	# 	num_objects = 14,
+	# 	num_targets = 4,
+	# 	k = 0.0005,
+	# 	lm = 0.9,
+	# 	sigma = 2.5,
+	# 	update_strategy="lowest",
+	# 	nearest_object_bound=30,
+	# )
 	# plot_id_wrt_targets(
 	# 	grid_side = 720,
 	# 	num_simulations = 100,
-	# 	num_time_steps = 20,
+	# 	num_time_steps = 50,
 	# 	num_objects = 14,
 	# 	max_num_targets = 8,
 	# 	k = 0.0005,
@@ -2538,7 +2645,11 @@ if __name__ == "__main__":
 		grid_side=720,
 		max_num_targets=8,
 		json_dir = "human-experiments/data/",
+		# json_files = ["human-experiments/data/ok.json"],
 		update_strategy="lowest",
 		nearest_object_bound=30,
-		model_updates_per_time_step=5,
+		model_updates_per_time_step=2,
+		plot_accuracies=True,
+		plot_correct_responses_count=True,
+		plot_confident_responses_count=True
 	)

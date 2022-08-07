@@ -81,6 +81,7 @@ class OurMOTModel:
 			target_locations     = self.target_locations
 			new_target_locations = []
 			# No need to use object identity (aka description or type!) in MOT model
+			# TODO: Incorporating ID information
 			for i, loc in enumerate(target_locations):
 				if np.random.random() > self.per_target_attention:
 					new_target_locations.append(loc)
@@ -118,14 +119,21 @@ class OurMOTModel:
 					# print("  new", new_target_locations)
 					# TODO: Incorporate two different parameters for tracking vs ID update
 					# if self.num_updates % 2 == 0:
+					# should_update_id = (self.num_updates % len(target_locations) < 2)
+					should_update_id = True
+					# should_update_id = (self.num_updates % 5 < 3)
+					# should_update_id = (self.num_updates % len(target_locations) < (7 - len(target_locations)))
+					# should_update_id = (self.num_updates % 2 == 1)
+					# should_update_id = (random.random() < 0.5)
 					new_idx = update_idx+1
 					while new_idx < len(target_locations):
 						if new_target_locations[update_idx] > new_target_locations[new_idx]:
 							del new_target_locations[update_idx]
 							new_target_locations.insert(new_idx, newloc)
-							idx = self.target_id_sequence[update_idx]
-							del self.target_id_sequence[update_idx]
-							self.target_id_sequence.insert(new_idx, idx)
+							if should_update_id:
+								idx = self.target_id_sequence[update_idx]
+								del self.target_id_sequence[update_idx]
+								self.target_id_sequence.insert(new_idx, idx)
 							break
 						new_idx += 1
 					new_idx = 0
@@ -133,9 +141,10 @@ class OurMOTModel:
 						if new_target_locations[update_idx] < new_target_locations[new_idx]:
 							del new_target_locations[update_idx]
 							new_target_locations.insert(new_idx, newloc)
-							idx = self.target_id_sequence[update_idx]
-							del self.target_id_sequence[update_idx]
-							self.target_id_sequence.insert(new_idx, idx)
+							if should_update_id:
+								idx = self.target_id_sequence[update_idx]
+								del self.target_id_sequence[update_idx]
+								self.target_id_sequence.insert(new_idx, idx)
 							break
 						new_idx += 1
 				else:
@@ -145,7 +154,7 @@ class OurMOTModel:
 					# Remove the appropriate ID in target-ID sequence
 					# target_locations = sorted(target_locations)
 					# id_pos = target_locations.index(loc)
-					del self.target_id_sequence[self.update_idx]
+					del self.target_id_sequence[update_idx]
 			else:
 				newloc, dist = OurMOTModel.nearest_object_heuristic(
 					env, i, j, bound=None

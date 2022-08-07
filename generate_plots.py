@@ -27,7 +27,11 @@ if __name__ == "__main__":
 				plt.title(plot_details["title"])
 				plt.xlabel(plot_details["xlabel"])
 				plt.ylabel(plot_details["ylabel"])
-				plt.ylim(*plot_details["ylim"])
+
+				bottom, top = plot_details["ylim"]
+				if top is not None and bottom is not None: plt.ylim(bottom=bottom, top=top)
+				elif top is not None: plt.ylim(top = top)
+				elif bottom is not None: plt.ylim(bottom = bottom)
 
 				plotfun = plot_details["plot_type"]
 				data = plot_details["data"]
@@ -40,16 +44,22 @@ if __name__ == "__main__":
 					elif plotfun == "scatter":
 						plt.scatter(x=d[0], y=d[1], label=label)
 					elif plotfun == "bar":
-						plt.bar(
-							x=d["x"],
-							height=d["height"],
-							tick_label=d["tick_label"],
-							yerr=d["yerr"],
-							width=d["width"],
-						)
+						if type(d) == dict:
+							plt.bar(
+								x=d["x"],
+								height=d["height"],
+								tick_label=d["tick_label"],
+								yerr=d["yerr"],
+								width=d["width"],
+							)
+						elif type(d) == list:
+							plt.bar(x = d[0], height=d[1])
 					else:
 						raise Exception("Don't know how to plot " + plotfun)
 				if len(data.keys()) > 1: plt.legend()
 				plt.savefig(PLOT_DIR+basename+".png", bbox_inches='tight', dpi=300)
 			except Exception as e:
 				print("Error while plotting from", PLOT_DATA_DIR+data_file, "\n ", str(e))
+			finally:
+				plt.close()
+

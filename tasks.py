@@ -225,7 +225,8 @@ def simulate_mot_using_experimental_data(
 		grid_side, max_num_targets, json_filename, model_updates_per_time_step, episodic_buffer_size=4,
 		episodic_buffer_decay_rate=0.9, per_target_attention=None, nearest_object_bound=None,
 		update_strategy="random", return_id_accuracy=False, use_static_indices=True,
-		id_only_for_perfect_tracking=False, return_swap_count=False):
+		id_only_for_perfect_tracking=False, return_swap_count=False,
+		return_final_attended_location_count=False):
 
 	momit_tracking_accuracies = {}
 	our_tracking_accuracies   = {}
@@ -233,11 +234,14 @@ def simulate_mot_using_experimental_data(
 	momit_id_accuracies = {}
 	our_id_accuracies   = {}
 
+	our_final_attended_location_count = {0: 0}
+
 	for i in range(1, max_num_targets+1):
 		momit_tracking_accuracies[i] = []
 		our_tracking_accuracies[i]   = []
 		momit_id_accuracies[i] = []
 		our_id_accuracies[i]   = []
+		our_final_attended_location_count[i] = 0
 
 	our_tt_swaps = []
 	our_tn_swaps = []
@@ -321,6 +325,8 @@ def simulate_mot_using_experimental_data(
 		our_id_accuracy, tt_swaps, tn_swaps, both_swaps, none_swaps = \
 			evaluate_id(env, our_model, return_swaps=True)
 
+		num_attended_locations = len(our_model.get_attended_locations(env))
+
 		momit_tracking_accuracies[num_targets].append(momit_tracking_accuracy)
 		our_tracking_accuracies[num_targets].append(our_tracking_accuracy)
 
@@ -328,6 +334,8 @@ def simulate_mot_using_experimental_data(
 			momit_id_accuracies[num_targets].append(momit_id_accuracy)
 		if not id_only_for_perfect_tracking or our_tracking_accuracy==1:
 			our_id_accuracies[num_targets].append(our_id_accuracy)
+
+		our_final_attended_location_count[num_attended_locations] += 1
 
 		# tt_swaps, tn_swaps, both_swaps, none_swaps = 0, 0, 0, 0
 		# if our_id_accuracy == 1: none_swaps = 1
@@ -359,6 +367,7 @@ def simulate_mot_using_experimental_data(
 
 	if return_id_accuracy: return_values += [momit_id_accuracies, our_id_accuracies]
 	if return_swap_count: return_values += [our_tt_swaps, our_tn_swaps, our_both_swaps, our_none_swaps]
+	if return_final_attended_location_count: return_values += [our_final_attended_location_count]
 	return return_values
 
 
