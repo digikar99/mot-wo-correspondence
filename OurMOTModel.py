@@ -19,42 +19,95 @@ class OurMOTModel:
 		self.per_target_attention = [1,0.85,0.7,0.6,0.5,0.3,0.1,0.03][self.num_targets-1]
 
 
+	# @staticmethod
+	# def nearest_object_heuristic(env, i, j, bound=None):
+	# 	ilim, jlim = env.shape
+	# 	object_locations = env.get_object_locations()
+	# 	object_found = False
+	# 	if bound is None: bound = max(ilim, jlim)
+	# 	for ortho_search_radius in range(0, bound):
+	# 		mini = max(i-ortho_search_radius, 0)
+	# 		maxi = min(i+ortho_search_radius+1, ilim)
+	# 		minj = max(j-ortho_search_radius, 0)
+	# 		maxj = min(j+ortho_search_radius+1, jlim)
+
+	# 		# print(mini, maxi, minj, maxj)
+
+	# 		if object_found: break
+	# 		newi = mini
+	# 		for newj in range(minj, maxj):
+	# 			# print("  top", (newi, newj), object_locations)
+	# 			if (newi,newj) in object_locations: object_found=True; break
+
+	# 		if object_found: break
+	# 		newi = maxi-1
+	# 		for newj in range(minj, maxj):
+	# 			# print("  bottom", (newi, newj), object_locations)
+	# 			if (newi,newj) in object_locations: object_found=True; break
+
+	# 		if object_found: break
+	# 		newj = minj
+	# 		for newi in range(mini, maxi):
+	# 			# print("  left", (newi, newj), object_locations)
+	# 			if (newi,newj) in object_locations: object_found=True; break
+	# 		if object_found: break
+	# 		newj = maxj-1
+	# 		for newi in range(mini, maxi):
+	# 			# print("  right", (newi, newj), object_locations)
+	# 			if (newi,newj) in object_locations: object_found=True; break
+
+	# 	if not object_found:
+	# 		newi, newj = random.choice(object_locations)
+
+	# 	# print(object_found, ortho_search_radius, "Old", (i,j), "New", (newi, newj))
+	# 	# print(object_locations)
+	# 	# print()
+	# 	dist = np.sqrt((i-newi)**2 + (j-newj)**2)
+	# 	return (newi, newj), dist
+
 	@staticmethod
 	def nearest_object_heuristic(env, i, j, bound=None):
 		ilim, jlim = env.shape
 		object_locations = env.get_object_locations()
-		object_found = False
 		if bound is None: bound = max(ilim, jlim)
-		for ortho_search_radius in range(0, bound):
-			mini = max(i-ortho_search_radius, 0)
-			maxi = min(i+ortho_search_radius+1, ilim)
-			minj = max(j-ortho_search_radius, 0)
-			maxj = min(j+ortho_search_radius+1, jlim)
 
-			# print(mini, maxi, minj, maxj)
+		manhattan_distance = 0
+		newi, newj = i, j
+		direction = "up_right"
 
-			if object_found: break
-			newi = mini
-			for newj in range(minj, maxj):
-				# print("  top", (newi, newj), object_locations)
-				if (newi,newj) in object_locations: object_found=True; break
+		while True:
 
-			if object_found: break
-			newi = maxi-1
-			for newj in range(minj, maxj):
-				# print("  bottom", (newi, newj), object_locations)
-				if (newi,newj) in object_locations: object_found=True; break
+			if -1 < newi < ilim and -1 < newj < jlim \
+			   and (newi, newj) in object_locations:
+				return ((newi, newj), manhattan_distance)
 
-			if object_found: break
-			newj = minj
-			for newi in range(mini, maxi):
-				# print("  left", (newi, newj), object_locations)
-				if (newi,newj) in object_locations: object_found=True; break
-			if object_found: break
-			newj = maxj-1
-			for newi in range(mini, maxi):
-				# print("  right", (newi, newj), object_locations)
-				if (newi,newj) in object_locations: object_found=True; break
+			if direction == "up_right":
+				if j == newj:
+					direction = "down_right"
+				else:
+					newi -= 1
+					newj += 1
+			elif direction == "down_right":
+				if i == newi:
+					direction = "down_left"
+				else:
+					newi += 1
+					newj += 1
+			elif direction == "down_left":
+				if j == newj:
+					direction = "up_left"
+				else:
+					newi += 1
+					newj -= 1
+			elif direction == "up_left":
+				if newi == i:
+					manhattan_distance += 1
+					newi = i
+					newj = j - manhattan_distance
+					direction = "up_right"
+				else:
+					newi -= 1
+					newj -= 1
 
 		if not object_found:
 			newi, newj = random.choice(object_locations)
@@ -62,7 +115,7 @@ class OurMOTModel:
 		# print(object_found, ortho_search_radius, "Old", (i,j), "New", (newi, newj))
 		# print(object_locations)
 		# print()
-		dist = np.sqrt((i-newi)**2 + (j-newj)**2)
+		dist = np.sum(np.abs(i-newi) + np.abs(j-newj))
 		return (newi, newj), dist
 
 	def process_env(self, env:Environment, observe_targets=False, strategy="random"):
