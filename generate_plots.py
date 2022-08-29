@@ -40,7 +40,12 @@ if __name__ == "__main__":
 					if plotfun == "plot":
 						plt.plot(d[0], d[1], label=label)
 					elif plotfun == "errorbar":
-						plt.errorbar(x=d[0], y=d[1], yerr=d[2], label=label)
+						if len(d) == 3:
+							plt.errorbar(x=d[0], y=d[1], yerr=d[2], label=label)
+						elif len(d) == 4:
+							plt.errorbar(x=d[0], y=d[1], yerr=d[2], label=label, fmt=d[3])
+						else:
+							raise Exception("Unknown data line format: " + str(d))
 					elif plotfun == "scatter":
 						plt.scatter(x=d[0], y=d[1], label=label)
 					elif plotfun == "bar":
