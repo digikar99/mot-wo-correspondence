@@ -4,21 +4,33 @@ import json
 import os
 import sys
 from cycler import cycler
+import argparse
 
 plt.rcParams.update({'font.size': 16})
 
-PLOT_DATA_DIR=("plot-data-v2/" if len(sys.argv)<2 else sys.argv[1])
+parser = argparse.ArgumentParser()
+parser.add_argument("--file", required=False, default=None)
+parser.add_argument(
+	"--dims", required=False, default="6x4", help="Dimensions of the figure in widthxheight inches"
+)
+args = parser.parse_args()
+args.dims = list(map(int, args.dims.split("x")))
+
+plot_data_file = args.file
+print(plot_data_file)
+PLOT_DATA_DIR="plot-data-v2/"
 PLOT_DIR="plots-v2/"
 
 if __name__ == "__main__":
 	data_files = os.listdir(PLOT_DATA_DIR)
 	for data_file in data_files:
-		basename = data_file.rsplit(".", maxsplit=1)[0]
+		basename, ext = os.path.splitext(data_file)
+		if plot_data_file != None and PLOT_DATA_DIR+data_file != plot_data_file: continue
 		with open(PLOT_DATA_DIR+data_file) as inf:
 			try:
 				plot_details = json.load(inf)
 				plt.clf()
-				plt.figure(figsize=(6,4))
+				plt.figure(figsize=args.dims)
 				markercycle = cycler(marker=['o', '^', 's', '*', 'P', 'd'])
 				colorcycle = cycler(color=plt.rcParams['axes.prop_cycle'].by_key()['color'][:6])
 				plt.gca().set_prop_cycle(colorcycle + markercycle)
