@@ -1,5 +1,5 @@
 
-from Environment import Environment
+from Environment import Environment, nearest_object_heuristic
 import random
 from OurMultiDict import MultiDict
 import numpy as np
@@ -73,14 +73,7 @@ class MOMIT:
 
 			# Find the object closest to the weakest binding
 			loc = target_locations[index]
-			nearest_object_locations = env.get_nearest_object_locations(loc)
-			newloc = None
-			for loc in nearest_object_locations:
-				self.time_lag += location_object_map[loc]
-				if location_object_map[loc] != objtype:
-					continue
-				newloc = loc
-				break
+			newloc, dist = nearest_object_heuristic(env, loc[0], loc[1])
 
 			# FIXME: What does the model say will happen when the binding strength becomes too low?
 			# For id tracking of multiple identical objects, we keep index the same
