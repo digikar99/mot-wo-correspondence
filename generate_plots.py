@@ -50,12 +50,12 @@ if __name__ == "__main__":
 				for label in data.keys():
 					d = data[label]
 					if plotfun == "plot":
-						plt.plot(d[0], d[1], label=label)
+						plt.plot(d[0], d[1], label=label, linewidth=2)
 					elif plotfun == "errorbar":
 						if len(d) == 3:
-							plt.errorbar(x=d[0], y=d[1], yerr=d[2], label=label)
+							plt.errorbar(x=d[0], y=d[1], yerr=d[2], label=label, linewidth=2)
 						elif len(d) == 4:
-							plt.errorbar(x=d[0], y=d[1], yerr=d[2], label=label, fmt=d[3])
+							plt.errorbar(x=d[0], y=d[1], yerr=d[2], label=label, fmt=d[3], linewidth=2)
 						else:
 							raise Exception("Unknown data line format: " + str(d))
 					elif plotfun == "scatter":
