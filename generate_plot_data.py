@@ -6,7 +6,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from cycler import cycler
 
-from tasks import simulate_mot, simulate_mit, simulate_mot_using_experimental_data
+from tasks import simulate_mot, simulate_mit, simulate_mot_using_experimental_data, NUM_BAD_TRIALS
 # from OUSpeedOnSameGrid import simulate
 import json
 
@@ -26,6 +26,7 @@ Structure of the plot data file:
 
 def write_plot_file(filename, title, xlabel, ylabel, ylim, plot_type, data, ):
 	"data: a dictionary mapping label to a list containing x and y data, and optionally errorbar data"
+	# print(PLOT_DIR+filename+".json")
 	with open(PLOT_DIR+filename+".json", "w") as f:
 		json.dump({
 			"title": title,
@@ -217,16 +218,24 @@ def plot_acc_wrt_sigma(
 	"""
 	Plots percentage of targets that were tracked wrt time
 	"""
-	our_accuracy_list      = []
-	our_accuracy_list_se   = []
-	chance_accuracy_list      = []
-	chance_accuracy_list_se   = []
+	our_accuracy_list_large    = []
+	our_accuracy_list_large_se = []
+	our_accuracy_list_small    = []
+	our_accuracy_list_small_se = []
+	chance_accuracy_list       = []
+	chance_accuracy_list_se    = []
 	min_sigma = 0.1
 	int_sigma = ((max_sigma - min_sigma)/10 if max_sigma is not None else None)
 	sigma_list = (np.arange(max_sigma,min_sigma,-int_sigma) if sigma_list is None else sigma_list)
 	for sigma in sigma_list:
-		_, our_accuracies = \
+		_, our_accuracies_large = \
 			simulate_mot(grid_side, num_simulations, num_time_steps, num_objects, num_targets,
+						 k = k, lm = lm, sigma = sigma,
+						 nearest_object_bound = nearest_object_bound,
+						 per_target_attention = per_target_attention,
+						 update_strategy = update_strategy)
+		_, our_accuracies_small = \
+			simulate_mot(grid_side//4, num_simulations, num_time_steps, num_objects, num_targets,
 						 k = k, lm = lm, sigma = sigma,
 						 nearest_object_bound = nearest_object_bound,
 						 per_target_attention = per_target_attention,
@@ -238,17 +247,22 @@ def plot_acc_wrt_sigma(
 						 per_target_attention = per_target_attention,
 						 update_strategy = update_strategy)
 
-		our_accuracy_list.append(np.mean(our_accuracies))
-		our_accuracy_list_se.append(np.std(our_accuracies, ddof=1)/np.sqrt(num_simulations))
+		our_accuracy_list_large.append(np.mean(our_accuracies_large))
+		our_accuracy_list_large_se.append(np.std(our_accuracies_large, ddof=1)/np.sqrt(num_simulations))
+
+		our_accuracy_list_small.append(np.mean(our_accuracies_small))
+		our_accuracy_list_small_se.append(np.std(our_accuracies_small, ddof=1)/np.sqrt(num_simulations))
 
 		chance_accuracy_list.append(np.mean(chance_accuracies))
 		chance_accuracy_list_se.append(np.std(chance_accuracies, ddof=1)/np.sqrt(num_simulations))
 
 
-	our_accuracy_list        = 100*np.asarray(our_accuracy_list)
-	our_accuracy_list_se     = 100*np.asarray(our_accuracy_list_se)
-	chance_accuracy_list     = 100*np.asarray(chance_accuracy_list)
-	chance_accuracy_list_se  = 100*np.asarray(chance_accuracy_list_se)
+	our_accuracy_list_large      = 100*np.asarray(our_accuracy_list_large)
+	our_accuracy_list_large_se   = 100*np.asarray(our_accuracy_list_large_se)
+	our_accuracy_list_small      = 100*np.asarray(our_accuracy_list_small)
+	our_accuracy_list_small_se   = 100*np.asarray(our_accuracy_list_small_se)
+	chance_accuracy_list         = 100*np.asarray(chance_accuracy_list)
+	chance_accuracy_list_se      = 100*np.asarray(chance_accuracy_list_se)
 
 	filename = get_filename(
 		"accuracy-sigma",
@@ -259,8 +273,10 @@ def plot_acc_wrt_sigma(
 	)
 	print(filename)
 	plt.clf()
-	plt.errorbar(sigma_list, our_accuracy_list, our_accuracy_list_se,
-				 label="Our Model")
+	plt.errorbar(sigma_list, our_accuracy_list_large, our_accuracy_list_large_se,
+				 label="Our Model ({0}x{0})".format(grid_side))
+	plt.errorbar(sigma_list, our_accuracy_list_small, our_accuracy_list_small_se,
+				 label="Our Model ({0}x{0})".format(grid_side//4))
 	plt.errorbar(sigma_list, chance_accuracy_list, chance_accuracy_list_se,
 				 label="Chance Performance")
 	plt.title("Accuracy vs Object Speeds\n({0} objects, {1} targets)"
@@ -279,10 +295,15 @@ def plot_acc_wrt_sigma(
 		ylim = [0,100],
 		plot_type = "errorbar",
 		data = {
-			"Our Model": [
+			"Our Model ({0}x{0})".format(grid_side): [
 				sigma_list,
-				our_accuracy_list,
-				our_accuracy_list_se,
+				our_accuracy_list_large,
+				our_accuracy_list_large_se,
+			],
+			"Our Model ({0}x{0})".format(grid_side//4): [
+				sigma_list,
+				our_accuracy_list_small,
+				our_accuracy_list_small_se,
 			],
 			"Chance Performance": [
 				sigma_list,
@@ -291,8 +312,6 @@ def plot_acc_wrt_sigma(
 			],
 		}
 	)
-
-	return our_accuracy_list
 
 
 def plot_momit_acc_wrt_sigma(
@@ -1414,7 +1433,8 @@ def plot_exp_id_wrt_targets(
 				# id_only_for_perfect_tracking=True
 				return_final_attended_location_count = True
 			)
-		# print(our_id_accuracies)
+		print(f, our_accuracies[1], sep="\n")
+		print()
 		_, chance_accuracies = \
 			simulate_mot_using_experimental_data(
 				grid_side,
@@ -1444,6 +1464,8 @@ def plot_exp_id_wrt_targets(
 			chance_accuracy_dict_se[i].append(
 				np.std(chance_accuracies[i], ddof=1)/np.sqrt(num_simulations)
 			)
+
+	print(NUM_BAD_TRIALS, "bad trials discarded")
 
 	our_accuracy_list       = []
 	our_accuracy_list_se    = []
@@ -2520,7 +2542,7 @@ def plot_nearest_object_benefit(
 
 
 if __name__ == "__main__":
-	np.random.seed(42)
+	np.random.seed(40)
 	# random.seed(43)
 	# acc = simulate_mot(
 	# 	grid_side = 720,
@@ -2530,10 +2552,12 @@ if __name__ == "__main__":
 	# 	num_targets = 4,
 	# 	k = 0.0005,
 	# 	lm = 0.9,
-	# 	sigma = 2,
-	# 	# nearest_object_bound=30
+	# 	sigma = 1,
+	# 	# sigma = 2,
+	# 	nearest_object_bound=50
 	# )
 	# print(acc)
+	# print(np.mean(acc))
 
 	# # SECTION 1: Accuracy vs Number of Targets =================================
 	# plot_acc_wrt_targets(
@@ -2551,101 +2575,77 @@ if __name__ == "__main__":
 
 	# SECTION 2: Accuracy vs Time of trial =====================================
 	# plot_acc_wrt_time(
-	# 	grid_side = 720,
+	# 	grid_side = 360,
 	# 	num_simulations = 100,
-	# 	max_time_steps = 50,
-	# 	num_objects = 14,
+	# 	max_time_steps = 100,
+	# 	num_objects = 8,
 	# 	num_targets = 4,
 	# 	k = 0.0005,
 	# 	lm = 0.9,
 	# 	sigma = 2,
 	# 	update_strategy="lowest",
-	# 	nearest_object_bound=30
+	# 	nearest_object_bound=50
 	# )
 
 	# # SECTION 3: Velocity / Sigma threshold vs Number of targets ===============
-	# plot_sigma_wrt_targets(
-	# 	base_grid_side = 720,
-	# 	num_simulations = 50,
-	# 	num_time_steps = 50,
-	# 	num_objects = 14,
-	# 	max_num_targets = 8,
-	# 	k = 0.0005,
-	# 	lm = 0.9,
-	# 	# sigma_list = [5, 4.5, 4, 3.6, 3.3, 3, 2.7, 2.4, 2.1, 1.8, 1.5,
-	# 	# 			  1.2, 1.0, 0.8, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1],
-	# 	sigma_list = [5, 4.5, 4, 3.6, 3.3, 3, 2.8, 2.6, 2.4, 2.2, 2.0, 1.8, 1.6,
-	# 				  1.4, 1.3, 1.2, 1.1, 1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1],
-	# 	accuracy_threshold = 80,
-	# 	update_strategy="lowest",
-	# 	nearest_object_bound=30,
-	# )
+	plot_sigma_wrt_targets(
+		base_grid_side = 720,
+		num_simulations = 50,
+		num_time_steps = 50,
+		num_objects = 14,
+		max_num_targets = 8,
+		k = 0.0005,
+		lm = 0.9,
+		# sigma_list = [5, 4.5, 4, 3.6, 3.3, 3, 2.7, 2.4, 2.1, 1.8, 1.5,
+		# 			  1.2, 1.0, 0.8, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1],
+		sigma_list = [5, 4.5, 4, 3.6, 3.3, 3, 2.8, 2.6, 2.4, 2.2, 2.0, 1.8, 1.6,
+					  1.4, 1.3, 1.2, 1.1, 1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1],
+		accuracy_threshold = 80,
+		update_strategy="lowest",
+		nearest_object_bound=50,
+	)
 
 	# SECTION 4: Accuracy wrt Velocity / Sigma =================================
 	# plot_acc_wrt_sigma(
 	# 	grid_side = 720,
 	# 	num_simulations = 100,
-	# 	num_time_steps = 50,
-	# 	num_objects = 14,
+	# 	num_time_steps = 100,
+	# 	num_objects = 12,
 	# 	num_targets = 4,
 	# 	k = 0.0005,
 	# 	lm = 0.9,
 	# 	max_sigma = 4,
 	# 	update_strategy="lowest",
-	# 	nearest_object_bound=30
+	# 	nearest_object_bound=50
 	# )
 
 	# SECTION 5: Tracking vs ID Performance ====================================
 	# plot_id_wrt_time(
-	# 	grid_side = 720,
+	# 	grid_side = 360,
 	# 	num_simulations = 100,
-	# 	max_time_steps = 400,
+	# 	max_time_steps = 100,
 	# 	num_objects = 8,
 	# 	num_targets = 4,
 	# 	k = 0.0005,
 	# 	lm = 0.9,
-	# 	sigma = 1.5,
+	# 	sigma = 2,
 	# 	update_strategy="lowest",
-	# 	nearest_object_bound=30,
-	# )
-	# plot_id_wrt_time(
-	# 	grid_side = 720,
-	# 	num_simulations = 50,
-	# 	max_time_steps = 50,
-	# 	num_objects = 14,
-	# 	num_targets = 4,
-	# 	k = 0.0005,
-	# 	lm = 0.9,
-	# 	sigma = 2.5,
-	# 	update_strategy="lowest",
-	# 	nearest_object_bound=30,
-	# )
-	# plot_id_wrt_targets(
-	# 	grid_side = 720,
-	# 	num_simulations = 100,
-	# 	num_time_steps = 50,
-	# 	num_objects = 14,
-	# 	max_num_targets = 8,
-	# 	k = 0.0005,
-	# 	lm = 0.9,
-	# 	sigma = 1.5,
-	# 	update_strategy="lowest",
-	# 	nearest_object_bound=30,
+	# 	nearest_object_bound=50,
 	# )
 
 
 	# SECTION 6: Swap Count ====================================================
 	# plot_id_swaps(
-	# 	grid_side = 720,
+	# 	grid_side = 360,
 	# 	num_simulations = 100,
-	# 	num_time_steps = 240,
+	# 	num_time_steps = 100,
 	# 	num_objects = 8,
 	# 	num_targets = 4,
 	# 	k = 0.0005,
 	# 	lm = 0.9,
-	# 	sigma = 1.5,
+	# 	sigma = 2,
 	# 	update_strategy="lowest",
-	# 	nearest_object_bound=30,
+	# 	nearest_object_bound=50,
 	# )
 	# plot_id_swaps(
 	# 	grid_side = 720,
@@ -2672,7 +2672,7 @@ if __name__ == "__main__":
 	# 	lm = 0.9,
 	# 	sigma = 2,
 	# 	update_strategy="lowest",
-	# 	nearest_object_bound=30,
+	# 	nearest_object_bound=50,
 	# )
 	# plot_momit_acc_wrt_time(
 	# 	grid_side = 720,
@@ -2684,7 +2684,7 @@ if __name__ == "__main__":
 	# 	lm = 0.9,
 	# 	sigma = 2,
 	# 	update_strategy="lowest",
-	# 	nearest_object_bound=30
+	# 	nearest_object_bound=50
 	# )
 	# plot_momit_sigma_wrt_targets(
 	# 	base_grid_side = 720,
@@ -2700,7 +2700,7 @@ if __name__ == "__main__":
 	# 				  1.4, 1.3, 1.2, 1.1, 1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1],
 	# 	accuracy_threshold = 80,
 	# 	update_strategy="lowest",
-	# 	nearest_object_bound=30,
+	# 	nearest_object_bound=50,
 	# )
 	# plot_momit_acc_wrt_sigma(
 	# 	grid_side = 720,
@@ -2712,21 +2712,21 @@ if __name__ == "__main__":
 	# 	lm = 0.9,
 	# 	max_sigma = 4,
 	# 	update_strategy="lowest",
-	# 	nearest_object_bound=30
+	# 	nearest_object_bound=50
 	# )
 
 	# SECTION 8: MOMIT ID Performance ==========================================
 	# plot_momit_id_wrt_time(
-	# 	grid_side = 720,
+	# 	grid_side = 360,
 	# 	num_simulations = 50,
-	# 	max_time_steps = 100,
+	# 	max_time_steps = 50,
 	# 	num_objects = 14,
 	# 	num_targets = 4,
 	# 	k = 0.0005,
 	# 	lm = 0.9,
 	# 	sigma = 2,
 	# 	update_strategy="lowest",
-	# 	nearest_object_bound=30,
+	# 	nearest_object_bound=50,
 	# )
 
 	# SECTION 9: Serial vs Parallel Comparison =================================
@@ -2739,18 +2739,18 @@ if __name__ == "__main__":
 	# 	k = 0.0005,
 	# 	lm = 0.9,
 	# 	sigma = 2,
-	# 	nearest_object_bound=30
+	# 	nearest_object_bound=50
 	# )
 	# plot_both_acc_wrt_time(
 	# 	grid_side = 720,
-	# 	num_simulations = 100,
+	# 	num_simulations = 50,
 	# 	max_time_steps = 50,
 	# 	num_objects = 14,
 	# 	num_targets = 4,
 	# 	k = 0.0005,
 	# 	lm = 0.9,
 	# 	sigma = 2,
-	# 	nearest_object_bound=30
+	# 	nearest_object_bound=50
 	# )
 	# plot_both_sigma_wrt_targets(
 	# 	base_grid_side = 720,
@@ -2765,18 +2765,18 @@ if __name__ == "__main__":
 	# 	sigma_list = [5, 4.5, 4, 3.6, 3.3, 3, 2.8, 2.6, 2.4, 2.2, 2.0, 1.8, 1.6,
 	# 				  1.4, 1.3, 1.2, 1.1, 1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1],
 	# 	accuracy_threshold = 80,
-	# 	nearest_object_bound=30,
+	# 	nearest_object_bound=50,
 	# )
 	# plot_both_acc_wrt_sigma(
 	# 	grid_side = 720,
-	# 	num_simulations = 100,
+	# 	num_simulations = 50,
 	# 	num_time_steps = 50,
 	# 	num_objects = 14,
 	# 	num_targets = 4,
 	# 	k = 0.0005,
 	# 	lm = 0.9,
 	# 	max_sigma = 4,
-	# 	nearest_object_bound=30
+	# 	nearest_object_bound=50
 	# )
 
 	# SECTION 10: Comparison of data against experimental data =================
@@ -2792,18 +2792,20 @@ if __name__ == "__main__":
 	# 	),
 	# 	sep="\n"
 	# )
-	plot_exp_id_wrt_targets(
-		grid_side=720,
-		max_num_targets=8,
-		json_dir = "human-experiments/data/",
-		# json_files = ["human-experiments/data/ok.json"],
-		update_strategy="lowest",
-		nearest_object_bound=30,
-		model_updates_per_time_step=2,
-		plot_accuracies=True,
-		plot_correct_responses_count=True,
-		plot_confident_responses_count=True
-	)
+	# plot_exp_id_wrt_targets(
+	# 	grid_side=720,
+	# 	max_num_targets=8,
+	# 	json_dir = "human-experiments/data/",
+	# 	# json_files = ["human-experiments/data/pretty-test.json.bak"],
+	# 	update_strategy="lowest",
+	# 	# nearest_object_bound=25,
+	# 	# model_updates_per_time_step=2,
+	# 	nearest_object_bound = 38,
+	# 	model_updates_per_time_step = 1.8,
+	# 	plot_accuracies=True,
+	# 	plot_correct_responses_count=True,
+	# 	plot_confident_responses_count=True
+	# )
 
 	# SECTION 11: Velocity vs Number of Distractors ============================
 	# plot_sigma_wrt_distractors(
