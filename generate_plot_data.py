@@ -2026,6 +2026,157 @@ def plot_sigma_wrt_targets(
 	)
 
 
+def plot_sigma_wrt_distractors(
+		base_grid_side,
+		num_simulations,
+		num_time_steps,
+		max_num_objects,
+		num_targets,
+		k, lm, max_sigma=None, sigma_list=None,
+		accuracy_threshold = 80,
+		per_target_attention=None,
+		nearest_object_bound=None,
+		update_strategy = "random"
+):
+	grid_side = base_grid_side
+	min_sigma = 0.1
+	int_sigma = ((max_sigma - min_sigma)/10 if max_sigma is not None else None)
+	sigma_list = (np.arange(max_sigma,min_sigma,-int_sigma) if sigma_list is None else sigma_list)
+	our_sigma_threshold_list     = []
+	num_distractors_list = np.arange(1, max_num_objects-num_targets+1)
+	if type(nearest_object_bound) == list: nob_list = nearest_object_bound
+	else: nob_list = [nearest_object_bound] * max_num_objects
+	print("num_distractors sigma momit_accuracy our_accuracy")
+	for i in range(max_num_objects-num_targets):
+		num_objects = num_targets + num_distractors_list[i]
+		nearest_object_bound = nob_list[i]
+		for sigma in sigma_list:
+			_, our_accuracies = \
+				simulate_mot(grid_side, num_simulations, num_time_steps, num_objects,
+							 num_targets, k, lm, sigma,
+							 per_target_attention = per_target_attention,
+							 nearest_object_bound = nearest_object_bound,
+							 update_strategy=update_strategy)
+
+			our_accuracy     = np.mean(our_accuracies)*100
+
+			print(num_objects-num_targets, sigma, our_accuracy)
+
+			if len(our_sigma_threshold_list)-1 < i and \
+			   ((our_accuracy >= accuracy_threshold) or (sigma == sigma_list[-1])):
+				sigma_threshold = sigma
+				our_sigma_threshold_list.append(sigma_threshold)
+			if len(our_sigma_threshold_list) == i+1: break
+
+	plt.plot(num_distractors_list, our_sigma_threshold_list, label="Our Model (w/o nob)")
+	plt.title("Velocity (sigma) Threshold vs Number of Distractors\n({0} Simulations, {1} Time Steps)"\
+			  .format(num_simulations, num_time_steps))
+	plt.xlabel("Number of distractors ({0} targets)".format(num_targets),)
+	plt.ylabel("Sigma threshold ({0}% accuracy)".format(accuracy_threshold),)
+	plt.ylim(0, max(sigma_list))
+	plt.legend()
+	plt.show()
+
+	filename = get_filename(
+		"sigma-distractors",
+		accuracy = accuracy_threshold,
+		time = num_time_steps,
+		per_target_attention = per_target_attention,
+		nearest_object_bound = nearest_object_bound,
+		update_strategy = update_strategy
+	)
+	write_plot_file(
+		filename = filename,
+		title = "Velocity (sigma) Threshold vs Number of Distractors\n({0} Simulations, {1} Time Steps)"\
+			.format(
+				num_simulations,
+				num_time_steps
+			),
+		ylim = [0, max(sigma_list)],
+		plot_type = "plot",
+		xlabel = "Number of distractors ({0} objects)".format(num_targets),
+		ylabel = "Sigma threshold ({0}% accuracy)".format(accuracy_threshold),
+		data = {
+			"Our Model": [num_distractors_list, our_sigma_threshold_list]
+		}
+	)
+
+
+def plot_sigma_wrt_spacing(
+		grid_side_list,
+		num_simulations,
+		num_time_steps,
+		num_objects,
+		num_targets,
+		k, lm, max_sigma=None, sigma_list=None,
+		accuracy_threshold = 80,
+		per_target_attention=None,
+		nearest_object_bound=None,
+		update_strategy = "random"
+):
+	min_sigma = 0.1
+	int_sigma = ((max_sigma - min_sigma)/10 if max_sigma is not None else None)
+	sigma_list = (np.arange(max_sigma,min_sigma,-int_sigma) if sigma_list is None else sigma_list)
+	our_sigma_threshold_list     = []
+	if type(nearest_object_bound) == list: nob_list = nearest_object_bound
+	else: nob_list = [nearest_object_bound] * len(grid_side_list)
+	print("grid_side sigma momit_accuracy our_accuracy")
+	for i in range(len(grid_side_list)):
+		grid_side = grid_side_list[i]
+		nearest_object_bound = nob_list[i]
+		for sigma in sigma_list:
+			_, our_accuracies = \
+				simulate_mot(grid_side, num_simulations, num_time_steps, num_objects,
+							 num_targets, k, lm, sigma,
+							 per_target_attention = per_target_attention,
+							 nearest_object_bound = nearest_object_bound,
+							 update_strategy=update_strategy)
+
+			our_accuracy     = np.mean(our_accuracies)*100
+
+			print(grid_side, sigma, our_accuracy)
+
+			if len(our_sigma_threshold_list)-1 < i and \
+			   ((our_accuracy >= accuracy_threshold) or (sigma == sigma_list[-1])):
+				sigma_threshold = sigma
+				our_sigma_threshold_list.append(sigma_threshold)
+			if len(our_sigma_threshold_list) == i+1: break
+
+	plt.plot(grid_side_list, our_sigma_threshold_list, label="Our Model (w/o nob)")
+	plt.title("Velocity (sigma) Threshold vs Object Spacing\n({0} Simulations, {1} Time Steps)"\
+			  .format(num_simulations, num_time_steps))
+	plt.xlabel("Size of grid ({0} objects, {1} targets)".format(num_objects, num_targets),)
+	plt.ylabel("Sigma threshold ({0}% accuracy)".format(accuracy_threshold),)
+	plt.ylim(0, max(sigma_list))
+	plt.legend()
+	plt.show()
+
+	filename = get_filename(
+		"sigma-spacing",
+		accuracy = accuracy_threshold,
+		time = num_time_steps,
+		per_target_attention = per_target_attention,
+		nearest_object_bound = nearest_object_bound,
+		update_strategy = update_strategy
+	)
+	write_plot_file(
+		filename = filename,
+		title = "Velocity (sigma) Threshold vs Object Spacing\n({0} Simulations, {1} Time Steps)"\
+			.format(
+				num_simulations,
+				num_time_steps
+			),
+		ylim = [0, max(sigma_list)],
+		plot_type = "plot",
+		xlabel = "Size of the grid ({0} objects, {1} targets)".format(num_objects, num_targets),
+		ylabel = "Sigma threshold ({0}% accuracy)".format(accuracy_threshold),
+		data = {
+			"Our Model": [grid_side_list, our_sigma_threshold_list]
+		}
+	)
+
+
+
 def plot_momit_sigma_wrt_targets(
 		base_grid_side,
 		num_simulations,
@@ -2653,3 +2804,38 @@ if __name__ == "__main__":
 		plot_correct_responses_count=True,
 		plot_confident_responses_count=True
 	)
+
+	# SECTION 11: Velocity vs Number of Distractors ============================
+	# plot_sigma_wrt_distractors(
+	# 	base_grid_side = 720,
+	# 	num_simulations = 50,
+	# 	num_time_steps = 50,
+	# 	max_num_objects = 14,
+	# 	num_targets = 4,
+	# 	k = 0.0005,
+	# 	lm = 0.9,
+	# 	# sigma_list = [5, 4.5, 4, 3.6, 3.3, 3, 2.7, 2.4, 2.1, 1.8, 1.5,
+	# 	# 			  1.2, 1.0, 0.8, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1],
+	# 	sigma_list = [5, 4.5, 4, 3.6, 3.3, 3, 2.8, 2.6, 2.4, 2.2, 2.0, 1.8, 1.6,
+	# 				  1.4, 1.3, 1.2, 1.1, 1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1],
+	# 	accuracy_threshold = 75,
+	# 	update_strategy="lowest",
+	# 	nearest_object_bound=50,
+	# )
+
+	# plot_sigma_wrt_spacing(
+	# 	grid_side_list = [90, 180, 270, 360, 450, 540, 630, 720],
+	# 	num_simulations = 50,
+	# 	num_time_steps = 50,
+	# 	num_objects = 14,
+	# 	num_targets = 4,
+	# 	k = 0.0005,
+	# 	lm = 0.9,
+	# 	# sigma_list = [5, 4.5, 4, 3.6, 3.3, 3, 2.7, 2.4, 2.1, 1.8, 1.5,
+	# 	# 			  1.2, 1.0, 0.8, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1],
+	# 	sigma_list = [5, 4.5, 4, 3.6, 3.3, 3, 2.8, 2.6, 2.4, 2.2, 2.0, 1.8, 1.6,
+	# 				  1.4, 1.3, 1.2, 1.1, 1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1],
+	# 	accuracy_threshold = 75,
+	# 	update_strategy="lowest",
+	# 	nearest_object_bound=50,
+	# )
