@@ -201,15 +201,18 @@ class OrnsteinUhlenbeckEnvironment(Environment):
 			i, j = loc
 			objtype = location_object_map[loc]
 			x, y, vx, vy = location_property_map[loc][:4]
-			newvx = int(-k*x + lm*vx + np.random.randn()*sigma)
-			newvy = int(-k*y + lm*vy + np.random.randn()*sigma)
+			# Note: floor(-1.2) -> -2 but int(-1.2) -> -1
+			# newvx = np.floor(-k*x + lm*vx + np.random.randn()*sigma)
+			# newvy = np.floor(-k*y + lm*vy + np.random.randn()*sigma)
+			newvx = -k*x + lm*vx + np.random.randn()*sigma
+			newvy = -k*y + lm*vy + np.random.randn()*sigma
 			if i + newvx < 0: newvx = -i
 			elif i + newvx >= maxi: newvx = maxi - i - 1
 			if j + newvy < 0: newvy = -j
 			elif j + newvy >= maxj: newvy = maxj - j - 1
 
 			x += newvx; y += newvy
-			newi = i+newvx; newj = j+newvy
+			newi = int(i+newvx); newj = int(j+newvy)
 			newloc = (newi, newj)
 			new_location_object_map[newloc] = objtype
 			new_location_property_map[newloc] = (x, y, newvx, newvy)
