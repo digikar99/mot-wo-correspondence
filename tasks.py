@@ -5,6 +5,33 @@ from OurMOTModel import OurMOTModel
 import json
 import math
 
+MIN_DIST = 10
+NUM_BAD_TRIALS = 0
+
+def is_bad_trial(trial, num_targets, min_dist=MIN_DIST):
+	# Return True, if trial contains two targets that reached a distance of min_dist with each other
+	object_list = trial["object_list"]
+	num_updates = len(object_list[0]["histi"])
+	num_objects = len(object_list)
+	for o1_idx in range(num_targets):
+		o1 = object_list[o1_idx]
+		for o2_idx in range(o1_idx+1, (num_targets if num_targets>1 else num_objects)):
+		# Let's test accuracies if two objects never come close
+		# for o2_idx in range(o1_idx+1, num_objects):
+
+			o2 = object_list[o2_idx]
+			for t in range(num_updates):
+				i1 = o1["histi"][t]
+				j1 = o1["histj"][t]
+				i2 = o2["histi"][t]
+				j2 = o2["histj"][t]
+				dist_square = (i1-i2)**2 + (j1-j2)**2
+				if dist_square < min_dist**2:
+					global NUM_BAD_TRIALS
+					# print("discarding a bad trial", NUM_BAD_TRIALS)
+					NUM_BAD_TRIALS += 1
+					return True
+	return False
 
 def evaluate_tracking(env, model):
 	true_target_locations = env.get_target_locations()
@@ -266,6 +293,7 @@ def simulate_mot_using_experimental_data(
 		trial_data     = all_trial_data[simulation_idx]
 		num_time_steps = trial_data["num_time_steps"]
 		num_targets = trial_data["num_targets"]
+		# if is_bad_trial(trial_data, num_targets): continue
 
 		env = ExperimentalEnvironment(
 			shape = (grid_side, grid_side),
