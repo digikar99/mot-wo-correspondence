@@ -277,6 +277,8 @@ def simulate_mot_using_experimental_data(
 
 	with open(json_filename) as f: json_data = json.load(f)
 	all_trial_data  = json_data["all_trial_data"]
+	num_practice_trials = json_data["session_details"]["num_practice_trials"]
+	all_trial_data = all_trial_data[num_practice_trials:]
 	num_simulations = len(all_trial_data)
 
 	# IMPORTANT: We want to maintain the semantics of time_step
