@@ -499,25 +499,39 @@
                                        :relative-correspondence-update-frequency
                                        relative-correspondence-update-frequency))))
           (*array-element-type* 'single-float)
-          (human-tracking-performance (aref
+          (human-tracking-performance (aref*
                                        (asarray
                                         (mapcar #'cdr
                                                 (sort human-tracking-performance #'cl:< :key #'car)))
                                        ;; ignore n=1 and n=2 targets cases
                                        '(2)))
-          (model-tracking-performance (aref
+          (model-tracking-performance (aref*
                                        (asarray
                                         (mapcar #'cdr
                                                 (sort model-tracking-performance #'cl:< :key #'car)))
+                                       '(2)))
+
+          (human-id-performance       (aref*
+                                       (asarray
+                                        (mapcar #'cdr
+                                                (sort human-id-performance #'cl:< :key #'car)))
+                                       ;; ignore n=1 and n=2 targets cases
+                                       '(2)))
+          (model-id-performance       (aref*
+                                       (asarray
+                                        (mapcar #'cdr
+                                                (sort model-id-performance #'cl:< :key #'car)))
                                        '(2))))
 
     (terpri)
+    ;; (print (list :nearest-object-bound nearest-object-bound
+    ;;              :model-updates-per-time-step model-updates-per-time-step))
     (print (list :nearest-object-bound nearest-object-bound
-                 :model-updates-per-time-step model-updates-per-time-step))
-    (print human-tracking-performance)
-    (print model-tracking-performance)
+                 :relative-correspondence-update-frequency relative-correspondence-update-frequency))
+    (print human-id-performance)
+    (print model-id-performance)
 
-    (mean-square-error human-tracking-performance model-tracking-performance)))
+    (mean-square-error human-id-performance model-id-performance)))
 
 (defun individual-mse (grid-side
                        &key nearest-object-bound
