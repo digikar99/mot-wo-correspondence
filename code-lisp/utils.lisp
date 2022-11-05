@@ -6,7 +6,10 @@
            #:nonzerop
            #:*human-data-dir*
            #:sem
-           #:write-plot-data-file))
+           #:write-plot-data-file
+
+           #:dtoi
+           #:ftoi))
 
 (in-package :tracking-without-indices/utils)
 
@@ -75,3 +78,54 @@
                             :if-exists :supersede
                             :if-does-not-exist :create)))
 
+
+#+sbcl
+(in-package :sb-vm)
+
+#+sbcl
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (sb-c:defknown %ftoi (single-float) (signed-byte 32)
+      (sb-c:any)
+    :overwrite-fndb-silently t)
+  (sb-c:defknown %dtoi (double-float) (signed-byte 32)
+      (sb-c:any)
+    :overwrite-fndb-silently t)
+  (define-vop (%ftoi)
+    (:translate %ftoi)
+    (:policy :fast-safe)
+    (:args (x :scs (single-reg)))
+    (:arg-types single-float)
+    (:results (y :scs (signed-reg)))
+    (:result-types signed-num)
+    (:generator 0
+                (inst cvttss2si y x)))
+  (define-vop (%dtoi)
+    (:translate %dtoi)
+    (:policy :fast-safe)
+    (:args (x :scs (double-reg)))
+    (:arg-types double-float)
+    (:results (y :scs (signed-reg)))
+    (:result-types signed-num)
+    (:generator 0
+                (inst cvttsd2si y x))))
+
+(in-package :tracking-without-indices/utils)
+
+(declaim (inline ftoi dtoi))
+(defun ftoi (x)
+  (declare (type single-float x)
+           (optimize speed))
+  (sb-vm::%ftoi x))
+(defun dtoi (x)
+  (declare (type double-float x)
+           (optimize speed))
+  (sb-vm::%dtoi x))
+
+(declaim (inline standard-gaussian))
+(defun standard-gaussian (&optional (n 16))
+  (declare (type (signed-byte 32) n))
+  (cl:/ (cl:- (loop :for rand :of-type double-float := (random 1.0d0)
+                    :repeat (the (signed-byte 32) (* n 12))
+                    :summing rand :of-type double-float)
+              (* n 6))
+        (cl:sqrt n)))
