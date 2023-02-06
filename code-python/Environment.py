@@ -14,95 +14,41 @@ def rand2d(max_x, max_y):
 # Code for both methods is kept, because euclidean can result in more accurate
 # performance it seems; TODO: Refactor to allow making nearest_object_heuristic
 # a parameter in relevant code
-# def nearest_object_heuristic(env, i, j, bound=None):
-# 	ilim, jlim = env.shape
-# 	object_locations = env.get_object_locations()
-# 	object_found = False
-# 	if bound is None: bound = max(ilim, jlim)
-# 	for ortho_search_radius in range(0, bound):
-# 		mini = max(i-ortho_search_radius, 0)
-# 		maxi = min(i+ortho_search_radius+1, ilim)
-# 		minj = max(j-ortho_search_radius, 0)
-# 		maxj = min(j+ortho_search_radius+1, jlim)
-
-# 		# print(mini, maxi, minj, maxj)
-
-# 		if object_found: break
-# 		newi = mini
-# 		for newj in range(minj, maxj):
-# 			# print("  top", (newi, newj), object_locations)
-# 			if (newi,newj) in object_locations: object_found=True; break
-
-# 		if object_found: break
-# 		newi = maxi-1
-# 		for newj in range(minj, maxj):
-# 			# print("  bottom", (newi, newj), object_locations)
-# 			if (newi,newj) in object_locations: object_found=True; break
-
-# 		if object_found: break
-# 		newj = minj
-# 		for newi in range(mini, maxi):
-# 			# print("  left", (newi, newj), object_locations)
-# 			if (newi,newj) in object_locations: object_found=True; break
-# 		if object_found: break
-# 		newj = maxj-1
-# 		for newi in range(mini, maxi):
-# 			# print("  right", (newi, newj), object_locations)
-# 			if (newi,newj) in object_locations: object_found=True; break
-
-# 	if not object_found:
-# 		newi, newj = random.choice(object_locations)
-
-# 	# print(object_found, ortho_search_radius, "Old", (i,j), "New", (newi, newj))
-# 	# print(object_locations)
-# 	# print()
-# 	dist = np.sqrt((i-newi)**2 + (j-newj)**2)
-# 	return (newi, newj), dist
-
-
-# Manhattan distance
 def nearest_object_heuristic(env, i, j, bound=None):
 	ilim, jlim = env.shape
 	object_locations = env.get_object_locations()
+	object_found = False
 	if bound is None: bound = max(ilim, jlim)
+	for ortho_search_radius in range(0, bound):
+		mini = max(i-ortho_search_radius, 0)
+		maxi = min(i+ortho_search_radius+1, ilim)
+		minj = max(j-ortho_search_radius, 0)
+		maxj = min(j+ortho_search_radius+1, jlim)
 
-	manhattan_distance = 0
-	newi, newj = i, j
-	direction = "up_right"
+		# print(mini, maxi, minj, maxj)
 
-	while True:
+		if object_found: break
+		newi = mini
+		for newj in range(minj, maxj):
+			# print("  top", (newi, newj), object_locations)
+			if (newi,newj) in object_locations: object_found=True; break
 
-		if -1 < newi < ilim and -1 < newj < jlim \
-		   and (newi, newj) in object_locations:
-			return ((newi, newj), manhattan_distance)
+		if object_found: break
+		newi = maxi-1
+		for newj in range(minj, maxj):
+			# print("  bottom", (newi, newj), object_locations)
+			if (newi,newj) in object_locations: object_found=True; break
 
-		if direction == "up_right":
-			if j == newj:
-				direction = "down_right"
-			else:
-				newi -= 1
-				newj += 1
-		elif direction == "down_right":
-			if i == newi:
-				direction = "down_left"
-			else:
-				newi += 1
-				newj += 1
-		elif direction == "down_left":
-			if j == newj:
-				direction = "up_left"
-			else:
-				newi += 1
-				newj -= 1
-		elif direction == "up_left":
-			if newi == i:
-				manhattan_distance += 1
-				newi = i
-				newj = j - manhattan_distance
-				direction = "up_right"
-			else:
-				newi -= 1
-				newj -= 1
+		if object_found: break
+		newj = minj
+		for newi in range(mini, maxi):
+			# print("  left", (newi, newj), object_locations)
+			if (newi,newj) in object_locations: object_found=True; break
+		if object_found: break
+		newj = maxj-1
+		for newi in range(mini, maxi):
+			# print("  right", (newi, newj), object_locations)
+			if (newi,newj) in object_locations: object_found=True; break
 
 	if not object_found:
 		newi, newj = random.choice(object_locations)
@@ -110,8 +56,62 @@ def nearest_object_heuristic(env, i, j, bound=None):
 	# print(object_found, ortho_search_radius, "Old", (i,j), "New", (newi, newj))
 	# print(object_locations)
 	# print()
-	dist = np.sum(np.abs(i-newi) + np.abs(j-newj))
+	dist = np.sqrt((i-newi)**2 + (j-newj)**2)
 	return (newi, newj), dist
+
+
+# Manhattan distance
+# def nearest_object_heuristic(env, i, j, bound=None):
+# 	ilim, jlim = env.shape
+# 	object_locations = env.get_object_locations()
+# 	if bound is None: bound = max(ilim, jlim)
+
+# 	manhattan_distance = 0
+# 	newi, newj = i, j
+# 	direction = "up_right"
+
+# 	while True:
+
+# 		if -1 < newi < ilim and -1 < newj < jlim \
+# 		   and (newi, newj) in object_locations:
+# 			return ((newi, newj), manhattan_distance)
+
+# 		if direction == "up_right":
+# 			if j == newj:
+# 				direction = "down_right"
+# 			else:
+# 				newi -= 1
+# 				newj += 1
+# 		elif direction == "down_right":
+# 			if i == newi:
+# 				direction = "down_left"
+# 			else:
+# 				newi += 1
+# 				newj += 1
+# 		elif direction == "down_left":
+# 			if j == newj:
+# 				direction = "up_left"
+# 			else:
+# 				newi += 1
+# 				newj -= 1
+# 		elif direction == "up_left":
+# 			if newi == i:
+# 				manhattan_distance += 1
+# 				newi = i
+# 				newj = j - manhattan_distance
+# 				direction = "up_right"
+# 			else:
+# 				newi -= 1
+# 				newj -= 1
+
+# 	if not object_found:
+# 		newi, newj = random.choice(object_locations)
+
+# 	# print(object_found, ortho_search_radius, "Old", (i,j), "New", (newi, newj))
+# 	# print(object_locations)
+# 	# print()
+# 	dist = np.sum(np.abs(i-newi) + np.abs(j-newj))
+# 	return (newi, newj), dist
 
 class Environment:
 	def __init__(self, shape, object_type_count_map, num_targets, location_object_map=None,
