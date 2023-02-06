@@ -1,6 +1,7 @@
 (polymorphic-functions.defpackage:defpackage :tracking-without-indices/utils
-  (:shadowing-import-exported-symbols :dense-numericals :polymorph.access)
-  (:use :cl :alexandria)
+  (:shadowing-import-exported-symbols :dense-numericals :polymorph.access
+                                      :extensible-compound-types-cl)
+  (:use :alexandria)
   (:export #:with-values-from-object
            #:jsonify
            #:nonzerop
@@ -9,7 +10,11 @@
            #:write-plot-data-file
 
            #:dtoi
-           #:ftoi))
+           #:ftoi
+
+           #:standard-gaussian
+           #:dist2
+           #:mean-square-error))
 
 (in-package :tracking-without-indices/utils)
 
@@ -122,10 +127,26 @@
   (sb-vm::%dtoi x))
 
 (declaim (inline standard-gaussian))
+(declaim (ftype (function (&optional fixnum) double-float) standard-gaussian))
 (defun standard-gaussian (&optional (n 16))
   (declare (type (signed-byte 32) n))
   (cl:/ (cl:- (loop :for rand :of-type double-float := (random 1.0d0)
                     :repeat (the (signed-byte 32) (* n 12))
                     :summing rand :of-type double-float)
-              (* n 6))
-        (cl:sqrt n)))
+              (cl:* n 6))
+        (the double-float (cl:sqrt (coerce n 'double-float)))))
+
+(polymorphic-functions:defpolymorph dist2
+    ((x1 number) (x2 number) (y1 number) (y2 number)) number
+  "Computes square(X1-X2) + square(Y1-Y2)"
+  (cl:+ (cl:* (cl:- x1 x2) (cl:- x1 x2))
+        (cl:* (cl:- y1 y2) (cl:- y1 y2))))
+
+(defun mean-square-error (x y)
+  (declare (optimize debug))
+  (let* ((diff   (subtract x y :broadcast nil))
+         (square (multiply diff diff :broadcast nil))
+         (mean   (mean square)))
+    ;; (break)q/
+    mean))
+

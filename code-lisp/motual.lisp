@@ -1,8 +1,12 @@
-(polymorphic-functions.defpackage:defpackage :tracking-without-indices/model
+(polymorphic-functions.defpackage:defpackage :tracking-without-indices/motual
   (:shadowing-import-exported-symbols :dense-arrays-plus-lite
-                                      :polymorph.access)
-  (:use :cl :alexandria :defclass-std
-        :tracking-without-indices/environment)
+                                      :polymorph.access
+                                      :extensible-compound-types-cl)
+  (:use :alexandria :defclass-std
+        :tracking-without-indices/environment
+        :tracking-without-indices/utils
+        :tracking-without-indices/model
+        :polymorphic-functions)
   (:export #:make-mot-model
            #:process-env
            #:model-num-updates
@@ -10,28 +14,18 @@
            #:model-target-location-id-alist
            #:model-target-location-id))
 
-(in-package :tracking-without-indices/model)
+(in-package :tracking-without-indices/motual)
 
-
-
-(defclass/std mot-model ()
-  ((num-targets
-    nearest-object-bound
-    location-sequence ; each of these correspond to a target
-    id-sequence
-    num-updates
-    update-idx
-    correspondence-update-frequency)))
-
-
-
-(defun loc< (loc1 loc2)
-  (optima.extra:let-match (((list i1 j1) loc1)
-                           ((list i2 j2) loc2))
-    (or (cl:< i1 i2)
-        (and (cl:= i1 i2) (cl:< j1 j2)))))
-
-
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defclass/std mot-model ()
+    ((num-targets
+      nearest-object-bound
+      location-sequence                 ; each of these correspond to a target
+      id-sequence
+      num-updates
+      update-idx
+      correspondence-update-frequency))))
+(define-orthogonally-specializing-type mot-model () ())
 
 (defun make-mot-model (env &key nearest-object-bound num-targets
                              correspondence-update-frequency)
@@ -48,8 +42,8 @@
                    :update-idx 0
                    :correspondence-update-frequency correspondence-update-frequency)))
 
-(defun model-num-updates (model) (slot-value model 'num-updates))
-(defun model-target-locations (model &optional env num-targets)
+(defpolymorph model-target-locations ((model mot-model) &optional env num-targets)
+    list
   (with-slots (location-sequence nearest-object-bound) model
     (unless num-targets (return-from model-target-locations location-sequence))
     (let* ((stored-locations (loop :for (i j) :in location-sequence
@@ -64,7 +58,9 @@
                                      0 num-remaining-locations)))
       (nconc stored-locations random-locations))))
 
-(defun model-target-location-id (model env loc num-targets &optional obtained-ids)
+(defpolymorph model-target-location-id
+    ((model mot-model) env loc num-targets &optional obtained-ids)
+    integer
   (declare (optimize debug))
   (with-slots (location-sequence id-sequence nearest-object-bound) model
     ;; (print (cons :id id-sequence))
@@ -83,8 +79,8 @@
                      (random-elt (set-difference (iota num-targets)
                                                  obtained-ids))))))
 
-
-(defun model-target-location-id-alist (model &optional env num-targets)
+(defpolymorph model-target-location-id-alist ((model mot-model) &optional env num-targets)
+    list
   (with-slots (location-sequence nearest-object-bound id-sequence) model
     ;; (setf location-sequence (sort location-sequence #'loc<))
     (unless num-targets (return-from model-target-location-id-alist
@@ -104,71 +100,6 @@
                                            :for id :in random-ids
                                            :collect (cons loc id))))
       (nconc stored-location-id-alist random-location-id-alist))))
-
-
-
-
-
-(defun nearest-object-location (env location nearest-object-bound)
-  (declare (optimize speed)
-           (type (signed-byte 32) nearest-object-bound)
-           (inline env-location-has-object-p))
-  (destructuring-bind (ilim jlim) (environment-shape env)
-    (declare (type (signed-byte 32) ilim jlim))
-    (destructuring-bind (i j) location
-      (loop ;; :with direction := :up-left
-            :with direction := :up-right
-            :with manhattan-distance :of-type (signed-byte 32) :=  0
-            :while (cl:< manhattan-distance nearest-object-bound)
-            :with newi :of-type (signed-byte 32) := i
-            :with newj :of-type (signed-byte 32) := j
-            ;; Start from the rightmost point, and traverse along
-            ;; the sides of a rhombus; increase the "radius" of the rhombus
-            ;; every time after completing one round
-            :do (when (and (cl:< -1 newi ilim)
-                           (cl:< -1 newj jlim)
-                           (env-location-has-object-p env newi newj))
-                  (return-from nearest-object-location (list newi newj)))
-                ;; (print (list newi newj))
-                (ecase direction
-                  (:up-right   (if (cl:= j newj)
-                                   (progn
-                                     ;; (incf manhattan-distance)
-                                     ;; (setq newi (cl:- i manhattan-distance)
-                                     ;;       newj j)
-                                     (setq direction :down-right))
-                                   (progn
-                                     (decf newi)
-                                     (incf newj))))
-                  (:down-right (if (cl:= i newi)
-                                   (setq direction :down-left)
-                                   (progn
-                                     (incf newi)
-                                     (incf newj))))
-                  (:down-left  (if (cl:= j newj)
-                                   (progn
-                                     ;; (incf manhattan-distance)
-                                     ;; (setq newi (cl:+ i manhattan-distance)
-                                     ;;       newj j)
-                                     (setq direction :up-left))
-                                   (progn
-                                     (incf newi)
-                                     (decf newj))))
-                  (:up-left    (if (cl:= i newi)
-                                   (progn
-                                     (incf manhattan-distance)
-                                     (setq newi i
-                                           newj (cl:- j manhattan-distance))
-                                     (setq direction :up-right))
-                                   (progn
-                                     (decf newi)
-                                     (decf newj)))))
-                ;; (ecase (random 4)
-                ;;   (0 )
-                ;;   (1)
-                ;;   (2)
-                ;;   (3))
-            :finally (return nil)))))
 
 #|
 
@@ -244,7 +175,7 @@
 
 |#
 
-(defun process-env (model env)
+(defpolymorph process-env ((model mot-model) env) t
   ;; (declare (optimize debug))
   (with-slots (update-idx
                num-updates
@@ -277,9 +208,10 @@
                (new-loc (nearest-object-location env
                                                  current-loc
                                                  ;; (if (cl:= 1 num-targets)
-                                                 ;;     #.(expt 2 10)
-                                                 ;;     nearest-object-bound)
-                                                 nearest-object-bound))
+                                                 ;; #.(expt 2 10)
+                                                 ;; nearest-object-bound)
+                                                 nearest-object-bound
+                                                 ))
                (update-correspondence-p (cl:< (random 1.0) correspondence-update-frequency)
                                         ;; (cl:< (random 1.0) (cl:/ 2.5 num-targets))
                                         ;; (zerop (rem num-updates num-targets))
